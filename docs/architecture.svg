@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1190" viewBox="0 0 1440 1190" role="img" aria-labelledby="title desc">
+  <title id="title">Borewell Visualizer architecture</title>
+  <desc id="desc">Layered architecture: React client, REST API, Go application layer, PostgreSQL data layer, and operational tooling.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1440" height="1190" fill="#ffffff"/>
+
+  <!-- Header -->
+  <text x="60" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#0f172a">Borewell Visualizer — System Architecture</text>
+  <text x="60" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" fill="#64748b">Runs offline in the browser by default; the Go + PostgreSQL backend adds authentication, row-level isolation, and shared file storage.</text>
+
+  <!-- Legend -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#475569">
+    <circle cx="1032" cy="52" r="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="1046" y="56">Client</text>
+    <circle cx="1104" cy="52" r="6" fill="#eef2ff" stroke="#a5b4fc" stroke-width="1.5"/>
+    <text x="1118" y="56">API</text>
+    <circle cx="1160" cy="52" r="6" fill="#f0fdfa" stroke="#99f6e4" stroke-width="1.5"/>
+    <text x="1174" y="56">Application</text>
+    <circle cx="1258" cy="52" r="6" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+    <text x="1272" y="56">Data</text>
+    <circle cx="1320" cy="52" r="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+    <text x="1334" y="56">Ops</text>
+  </g>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+
+    <!-- ============ BAND A: CLIENT ============ -->
+    <rect x="60" y="135" width="1320" height="245" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="84" y="168" font-size="12" font-weight="700" letter-spacing="1.4" fill="#94a3b8">CLIENT — REACT 18 · VITE 5</text>
+
+    <rect x="84" y="185" width="300" height="110" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="234" y="222" text-anchor="middle" font-size="16" font-weight="600" fill="#1e3a8a">React SPA</text>
+    <text x="234" y="246" text-anchor="middle" font-size="12.5" fill="#475569">Vite dev server · HashRouter</text>
+    <text x="234" y="268" text-anchor="middle" font-size="12.5" fill="#475569">code splitting · lazy routes</text>
+
+    <rect x="408" y="185" width="300" height="110" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="558" y="222" text-anchor="middle" font-size="16" font-weight="600" fill="#1e3a8a">Shell &amp; Routing</text>
+    <text x="558" y="246" text-anchor="middle" font-size="12.5" fill="#475569">AppShell · sidebar · drawer</text>
+    <text x="558" y="268" text-anchor="middle" font-size="12.5" fill="#475569">Auth pages · admin approval</text>
+
+    <rect x="732" y="185" width="300" height="110" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="882" y="222" text-anchor="middle" font-size="16" font-weight="600" fill="#1e3a8a">Feature Pages</text>
+    <text x="882" y="246" text-anchor="middle" font-size="12.5" fill="#475569">Dashboard · Projects · Designer</text>
+    <text x="882" y="268" text-anchor="middle" font-size="12.5" fill="#475569">Geology · Monitoring · Docs · Reports</text>
+
+    <rect x="1056" y="185" width="300" height="110" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="1206" y="222" text-anchor="middle" font-size="16" font-weight="600" fill="#1e3a8a">Client State</text>
+    <text x="1206" y="246" text-anchor="middle" font-size="12.5" fill="#475569">AuthContext · ProjectContext</text>
+    <text x="1206" y="268" text-anchor="middle" font-size="12.5" fill="#475569">JWT in memory · refresh cookie</text>
+
+    <rect x="84" y="315" width="1272" height="45" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="720" y="343" text-anchor="middle" font-size="13" fill="#475569">Offline store — LocalStorage (projects, wells, designer, geology, monitoring) · IndexedDB BorewellDocsDB (photos, documents &gt; 2 MB)</text>
+
+    <!-- A -> B -->
+    <line x1="720" y1="380" x2="720" y2="416" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="734" y="404" font-size="12" fill="#64748b">HTTPS · JSON over /api/v1</text>
+
+    <!-- ============ BAND B: API ============ -->
+    <rect x="60" y="420" width="1320" height="150" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="84" y="453" font-size="12" font-weight="700" letter-spacing="1.4" fill="#94a3b8">API — REST · JWT</text>
+
+    <rect x="84" y="470" width="300" height="80" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="234" y="503" text-anchor="middle" font-size="16" font-weight="600" fill="#3730a3">API Client</text>
+    <text x="234" y="527" text-anchor="middle" font-size="12.5" fill="#475569">axios · interceptors · token refresh</text>
+
+    <rect x="408" y="470" width="300" height="80" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="558" y="503" text-anchor="middle" font-size="16" font-weight="600" fill="#3730a3">Vite Proxy</text>
+    <text x="558" y="527" text-anchor="middle" font-size="12.5" fill="#475569">/api → http://127.0.0.1:8080</text>
+
+    <rect x="732" y="470" width="300" height="80" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="882" y="503" text-anchor="middle" font-size="16" font-weight="600" fill="#3730a3">Gin Server</text>
+    <text x="882" y="527" text-anchor="middle" font-size="12.5" fill="#475569">:8080 · REST · graceful shutdown</text>
+
+    <rect x="1056" y="470" width="300" height="80" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="1206" y="503" text-anchor="middle" font-size="16" font-weight="600" fill="#3730a3">Middleware</text>
+    <text x="1206" y="527" text-anchor="middle" font-size="12.5" fill="#475569">RequestID · CORS · CSRF · JWT · rate limit</text>
+
+    <!-- B -> C -->
+    <line x1="720" y1="570" x2="720" y2="606" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="734" y="594" font-size="12" fill="#64748b">route dispatch</text>
+
+    <!-- ============ BAND C: APPLICATION ============ -->
+    <rect x="60" y="610" width="1320" height="175" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="84" y="643" font-size="12" font-weight="700" letter-spacing="1.4" fill="#94a3b8">APPLICATION — GO 1.22</text>
+
+    <rect x="84" y="660" width="300" height="100" rx="10" fill="#f0fdfa" stroke="#99f6e4"/>
+    <text x="234" y="695" text-anchor="middle" font-size="16" font-weight="600" fill="#115e59">Handlers</text>
+    <text x="234" y="719" text-anchor="middle" font-size="12.5" fill="#475569">auth · projects · wells · modules</text>
+    <text x="234" y="741" text-anchor="middle" font-size="12.5" fill="#475569">docs · backup · admin · migration</text>
+
+    <rect x="408" y="660" width="300" height="100" rx="10" fill="#f0fdfa" stroke="#99f6e4"/>
+    <text x="558" y="695" text-anchor="middle" font-size="16" font-weight="600" fill="#115e59">Services</text>
+    <text x="558" y="719" text-anchor="middle" font-size="12.5" fill="#475569">validation · business rules</text>
+    <text x="558" y="741" text-anchor="middle" font-size="12.5" fill="#475569">Argon2id · token families</text>
+
+    <rect x="732" y="660" width="300" height="100" rx="10" fill="#f0fdfa" stroke="#99f6e4"/>
+    <text x="882" y="695" text-anchor="middle" font-size="16" font-weight="600" fill="#115e59">Repositories</text>
+    <text x="882" y="719" text-anchor="middle" font-size="12.5" fill="#475569">parameterised SQL · transactions</text>
+    <text x="882" y="741" text-anchor="middle" font-size="12.5" fill="#475569">user · project · well · doc · module</text>
+
+    <rect x="1056" y="660" width="300" height="100" rx="10" fill="#f0fdfa" stroke="#99f6e4"/>
+    <text x="1206" y="695" text-anchor="middle" font-size="16" font-weight="600" fill="#115e59">File Storage</text>
+    <text x="1206" y="719" text-anchor="middle" font-size="12.5" fill="#475569">SHA-256 dedup · MIME checks</text>
+    <text x="1206" y="741" text-anchor="middle" font-size="12.5" fill="#475569">path-traversal guard · 10/20 MB caps</text>
+
+    <!-- C -> D -->
+    <line x1="720" y1="785" x2="720" y2="821" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="734" y="809" font-size="12" fill="#64748b">SQL · filesystem I/O</text>
+
+    <!-- ============ BAND D: DATA ============ -->
+    <rect x="60" y="825" width="1320" height="175" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="84" y="858" font-size="12" font-weight="700" letter-spacing="1.4" fill="#94a3b8">DATA — POSTGRESQL 15+</text>
+
+    <rect x="84" y="875" width="300" height="100" rx="10" fill="#fffbeb" stroke="#fcd34d"/>
+    <text x="234" y="910" text-anchor="middle" font-size="16" font-weight="600" fill="#92400e">PostgreSQL</text>
+    <text x="234" y="934" text-anchor="middle" font-size="12.5" fill="#475569">borewell database</text>
+    <text x="234" y="956" text-anchor="middle" font-size="12.5" fill="#475569">users · projects · wells · files</text>
+
+    <rect x="408" y="875" width="300" height="100" rx="10" fill="#fffbeb" stroke="#fcd34d"/>
+    <text x="558" y="910" text-anchor="middle" font-size="16" font-weight="600" fill="#92400e">Migrations</text>
+    <text x="558" y="934" text-anchor="middle" font-size="12.5" fill="#475569">13 versioned SQL migrations</text>
+    <text x="558" y="956" text-anchor="middle" font-size="12.5" fill="#475569">schema · triggers · indexes</text>
+
+    <rect x="732" y="875" width="300" height="100" rx="10" fill="#fffbeb" stroke="#fcd34d"/>
+    <text x="882" y="910" text-anchor="middle" font-size="16" font-weight="600" fill="#92400e">Row Level Security</text>
+    <text x="882" y="934" text-anchor="middle" font-size="12.5" fill="#475569">project &amp; well isolation</text>
+    <text x="882" y="956" text-anchor="middle" font-size="12.5" fill="#475569">fail-closed policies</text>
+
+    <rect x="1056" y="875" width="300" height="100" rx="10" fill="#fffbeb" stroke="#fcd34d"/>
+    <text x="1206" y="910" text-anchor="middle" font-size="16" font-weight="600" fill="#92400e">Backup</text>
+    <text x="1206" y="934" text-anchor="middle" font-size="12.5" fill="#475569">pg_dump · file archive</text>
+    <text x="1206" y="956" text-anchor="middle" font-size="12.5" fill="#475569">ZIP restore in the UI</text>
+
+    <!-- D <- E -->
+    <line x1="250" y1="1040" x2="250" y2="1004" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="264" y="1028" font-size="12" fill="#64748b">DDL · seed data</text>
+
+    <!-- ============ BAND E: OPS ============ -->
+    <rect x="60" y="1040" width="1320" height="110" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="84" y="1073" font-size="12" font-weight="700" letter-spacing="1.4" fill="#94a3b8">OPERATIONS</text>
+
+    <rect x="84" y="1085" width="408" height="60" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="288" y="1110" text-anchor="middle" font-size="15" font-weight="600" fill="#334155">Migrate CLI</text>
+    <text x="288" y="1131" text-anchor="middle" font-size="12.5" fill="#475569">go run ./cmd/migrate — applies schema versions</text>
+
+    <rect x="516" y="1085" width="408" height="60" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="720" y="1110" text-anchor="middle" font-size="15" font-weight="600" fill="#334155">Bootstrap Admin CLI</text>
+    <text x="720" y="1131" text-anchor="middle" font-size="12.5" fill="#475569">creates the first approved administrator</text>
+
+    <rect x="948" y="1085" width="408" height="60" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="1152" y="1110" text-anchor="middle" font-size="15" font-weight="600" fill="#334155">Docker</text>
+    <text x="1152" y="1131" text-anchor="middle" font-size="12.5" fill="#475569">postgres:15 container for local development</text>
+
+  </g>
+</svg>

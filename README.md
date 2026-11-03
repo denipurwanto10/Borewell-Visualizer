@@ -82,7 +82,7 @@ Interactive web application for visualizing and documenting borehole constructio
 
 ## Architecture
 
-![Architecture Diagram](.archify/architecture-borewell-20261104-043000/architecture.html)
+![Borewell Visualizer system architecture](docs/architecture.svg)
 
 The application runs in two modes:
 
