@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Camera, Plus, RotateCcw, Save, X } from 'lucide-react';
 import { Button, PageHead } from './Primitives';
 import { ACTIVITY_KEYS } from '../model';
@@ -50,6 +50,10 @@ function Category({ index, id, items, onFiles, onRemove }) {
 }
 
 export default function DocsPage({ activity, setActivity, notify, onSave, onReset }) {
+  useEffect(() => {
+    onSave?.();
+  }, [activity]);
+
   const onFiles = async (files, key) => {
     if (!files.length) return;
     const current = activity[key] || [];
@@ -98,11 +102,6 @@ export default function DocsPage({ activity, setActivity, notify, onSave, onRese
         {ACTIVITY_KEYS.map((key, index) => (
           <Category key={key} id={key} index={index} items={activity[key] || []} onFiles={onFiles} onRemove={remove} />
         ))}
-      </div>
-
-      <div className="savebar">
-        <Button variant="ghost" icon={RotateCcw} onClick={onReset}>Reset</Button>
-        <Button icon={Save} onClick={onSave}>Simpan dokumentasi</Button>
       </div>
     </div>
   );

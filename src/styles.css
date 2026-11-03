@@ -158,7 +158,7 @@ img { display: block; max-width: 100%; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 9px 20px;
   border: 0; background: none;
-  border-radius: 999px;
+  border-radius: 20px;
   color: var(--mute);
   font-size: 14px; font-weight: 600;
   white-space: nowrap;
@@ -184,7 +184,7 @@ img { display: block; max-width: 100%; }
   height: var(--h);
   padding: 0 18px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 20px;
   font-size: 14px; font-weight: 600; letter-spacing: -.005em;
   white-space: nowrap;
   user-select: none;
@@ -584,7 +584,7 @@ input[type='number']::-webkit-outer-spin-button, input[type='number']::-webkit-i
   position: sticky; bottom: 20px; z-index: 30;
   width: fit-content; margin: 28px 0 0 auto;
   display: flex; gap: 8px; padding: 8px;
-  border: 1px solid var(--line); border-radius: 999px;
+  border: 1px solid var(--line); border-radius: 20px;
   background: rgba(251, 250, 246, .85);
   -webkit-backdrop-filter: saturate(1.4) blur(16px); backdrop-filter: saturate(1.4) blur(16px);
   box-shadow: var(--shadow-2);

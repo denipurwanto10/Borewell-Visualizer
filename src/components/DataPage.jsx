@@ -39,7 +39,10 @@ function PhotoSlot({ id, title, hint, src, onFile, onRemove }) {
 }
 
 export default function DataPage({ well, setWell, notify, onSave, onReset }) {
-  const update = (key) => (event) => setWell((current) => ({ ...current, [key]: event.target.value }));
+  const update = (key) => (event) => {
+    setWell((current) => ({ ...current, [key]: event.target.value }));
+    onSave?.();
+  };
   const bind = (key) => ({ value: well[key] || '', onChange: update(key) });
 
   const onBoreholePhoto = async (file, key) => {
@@ -118,10 +121,7 @@ export default function DataPage({ well, setWell, notify, onSave, onReset }) {
         </section>
       </div>
 
-      <div className="savebar">
-        <Button variant="ghost" icon={RotateCcw} onClick={onReset}>Reset</Button>
-        <Button icon={Save} onClick={onSave}>Simpan data</Button>
-      </div>
+      
     </div>
   );
 }
