@@ -389,5 +389,3 @@ tar -czf files_backup_$(date +%Y%m%d_%H%M%S).tar.gz ./data/files
 - Advanced charting (drill-down, annotations)
 
 ---
-
-**Dibangun dengan ❤️ untuk komunitas teknik sumur bor Indonesia**
