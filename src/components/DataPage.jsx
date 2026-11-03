@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ImagePlus, RotateCcw, Save, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ImagePlus, RotateCcw, Save, X, Check } from 'lucide-react';
 import { Button, Field, PageHead } from './Primitives';
 import { PROVINCES } from '../model';
 import { readImageFile } from '../hooks';
@@ -39,9 +39,21 @@ function PhotoSlot({ id, title, hint, src, onFile, onRemove }) {
 }
 
 export default function DataPage({ well, setWell, notify, onSave, onReset }) {
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null); // 'success' | 'error' | null
+  const initialWellRef = useRef(well);
+
+  // Track dirty state - compare with initial well data
+  useEffect(() => {
+    const initial = initialWellRef.current;
+    const hasChanges = JSON.stringify(well) !== JSON.stringify(initial);
+    setDirty(hasChanges);
+  }, [well]);
+
   const update = (key) => (event) => {
     setWell((current) => ({ ...current, [key]: event.target.value }));
-    onSave?.();
+    setDirty(true);
   };
   const bind = (key) => ({ value: well[key] || '', onChange: update(key) });
 
@@ -49,6 +61,7 @@ export default function DataPage({ well, setWell, notify, onSave, onReset }) {
     try {
       const dataUrl = await readImageFile(file);
       setWell((current) => ({ ...current, boreholeImages: { ...current.boreholeImages, [key]: dataUrl } }));
+      setDirty(true);
       notify('Foto borehole berhasil disimpan.', 'success');
     } catch (error) {
       notify(error.message, 'error');
@@ -60,6 +73,24 @@ export default function DataPage({ well, setWell, notify, onSave, onReset }) {
     delete next[key];
     return { ...current, boreholeImages: next };
   });
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveStatus(null);
+    try {
+      onSave?.();
+      initialWellRef.current = well;
+      setDirty(false);
+      setSaveStatus('success');
+      notify('Data sumur bor berhasil disimpan.', 'success');
+    } catch (error) {
+      setSaveStatus('error');
+      notify('Gagal menyimpan data.', 'error');
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveStatus(null), 3000);
+    }
+  };
 
   const photoCount = PHOTOS.filter(([key]) => well.boreholeImages?.[key]).length;
 
@@ -121,7 +152,40 @@ export default function DataPage({ well, setWell, notify, onSave, onReset }) {
         </section>
       </div>
 
-      
+      {/* Save Bar */}
+      <div className="savebar" role="status" aria-live="polite">
+        {dirty && (
+          <>
+            <span className="savebar-status mono" aria-label="Perubahan belum disimpan">
+              <Save size={14} strokeWidth={2} /> Perubahan belum disimpan
+            </span>
+            <Button variant="primary" icon={Save} loading={saving} onClick={handleSave} disabled={!dirty || saving}>
+              Simpan
+            </Button>
+          </>
+        )}
+        {!dirty && !saving && (
+          <>
+            <span className="savebar-status mono saved" aria-label="Semua perubahan tersimpan">
+              <Check size={14} strokeWidth={2} /> Semua perubahan tersimpan
+            </span>
+            <Button variant="ghost" icon={Save} onClick={handleSave} disabled={saving}>
+              Simpan
+            </Button>
+          </>
+        )}
+        {saveStatus === 'success' && (
+          <span className="savebar-toast success mono" aria-label="Disimpan">
+            <Check size={14} strokeWidth={2} /> Tersimpan
+          </span>
+        )}
+        {saveStatus === 'error' && (
+          <span className="savebar-toast error mono" aria-label="Gagal menyimpan">
+            <X size={14} strokeWidth={2} /> Gagal menyimpan
+          </span>
+        )}
+      </div>
+
     </div>
   );
 }

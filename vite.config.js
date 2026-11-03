@@ -9,6 +9,12 @@ export default defineConfig({
     assetsDir: 'assets',
     rollupOptions: {
       output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-pdf': ['jspdf'],
+          'vendor-zip': ['jszip'],
+          'vendor-icons': ['lucide-react'],
+        },
         assetFileNames: (assetInfo) => {
           let extType = assetInfo.name.split('.').at(1) || 'asset'
           if (/png|jpe?g|gif|webp|svg|ico/.test(extType)) {
@@ -20,9 +26,22 @@ export default defineConfig({
           return `assets/${assetInfo.name}.${extType}`
         }
       }
-    }
+    },
+    chunkSizeWarningLimit: 600,
   },
   server: {
-    open: true
+    open: true,
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        headers: {
+          Origin: 'http://127.0.0.1:8080',
+        },
+      },
+    },
   }
 })

@@ -1,60 +1,242 @@
-import { useEffect, useRef, useState } from 'react';
-import { ClipboardList, Download, Images, RotateCcw, Ruler } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback, useMemo, Component } from 'react';
+import { Download, RotateCcw, Ruler, ClipboardList, Images, Layers, Droplets, FileText, FilePlus } from 'lucide-react';
 import VisualizationPage from './components/VisualizationPage';
+import DesignerPage from './components/DesignerPage';
 import DataPage from './components/DataPage';
 import DocsPage from './components/DocsPage';
-import { Button, Toast, useConfirm } from './components/Primitives';
-import { useBoreholeState } from './hooks';
+import DocumentationPage from './components/DocumentationPage';
+import ProjectDocumentationPage from './components/ProjectDocumentationPage';
+import ReportBuilderPage from './components/ReportBuilderPage';
+import ProjectsPage from './components/ProjectsPage';
+import ProjectDetailPage from './components/ProjectDetailPage';
+import DashboardPage from './components/DashboardPage';
+import GeologyPage from './components/GeologyPage';
+import MonitoringPage from './components/MonitoringPage';
+import DataManagementPage from './components/DataManagementPage';
+import { Button, Toast, useConfirm, PageHead } from './components/Primitives';
+import { useProject } from './context/ProjectContext';
+import { useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import LoginPage from './components/auth/LoginPage';
+import RegisterPage from './components/auth/RegisterPage';
+import PendingApprovalPage from './components/auth/PendingApprovalPage';
+import RejectedAccountPage from './components/auth/RejectedAccountPage';
+import SuspendedAccountPage from './components/auth/SuspendedAccountPage';
+import AdminApprovalPage from './components/auth/AdminApprovalPage';
+import AppShell from './components/layout/AppShell';
+import AuthLayout from './components/layout/AuthLayout';
 import { downloadBoreholePdf } from './pdf';
-import { INITIAL_WELL, makeEmptyActivity } from './model';
+import { INITIAL_WELL, EMPTY_MODEL, makeEmptyActivity } from './model';
 import logo from '../img/tubes.png';
 
-const NAV_ITEMS = [
-  { id: 'page1', label: 'Visualisasi', short: 'Visual', icon: Ruler },
-  { id: 'page2', label: 'Data Sumur', short: 'Data', icon: ClipboardList },
-  { id: 'page3', label: 'Dokumentasi', short: 'Foto', icon: Images },
-];
+const RAIL_QUERY = '(min-width: 1100px) and (max-width: 1279px)';
 
 const freshWell = () => ({ ...INITIAL_WELL, boreholeImages: {} });
+const freshModel = () => ({ ...EMPTY_MODEL, pipes: [], screens: [] });
+const freshActivity = () => makeEmptyActivity();
+
+class ErrorBoundary extends Component {
+  state = { error: null, errorInfo: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, errorInfo) {
+    this.setState({ error, errorInfo });
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: '20px', color: 'red', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+          <h2>Render Error Caught</h2>
+          <p><strong>Error:</strong> {this.state.error?.message}</p>
+          <p><strong>Stack:</strong></p>
+          <pre>{this.state.error?.stack}</pre>
+          <p><strong>Component Stack:</strong></p>
+          <pre>{this.state.errorInfo?.componentStack}</pre>
+          <button onClick={() => this.setState({ error: null, errorInfo: null })}>Try Again</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
-  const { model, setModel, well, setWell, activity, setActivity, page, setPage, toast, setToast, notify, persist } = useBoreholeState();
+  const { user, loading: authLoading, isAuthenticated, isAdmin, logout } = useAuth();
+  const {
+    projects,
+    activeProjectId,
+    activeWellId,
+    activeProject,
+    activeWell,
+    loading: projectLoading,
+    toast: projectToast,
+    setToast: setProjectToast,
+    notify: projectNotify,
+    selectProject,
+    selectWell,
+    loadActiveWellData,
+    saveActiveWellData,
+    refreshProjects,
+  } = useProject();
+
   const [isDownloading, setIsDownloading] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
+  const [railCollapsed, setRailCollapsed] = useState(() => typeof window !== 'undefined' && window.matchMedia(RAIL_QUERY).matches);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+
   const canvasRef = useRef(null);
+  const [model, setModel] = useState(freshModel());
+  const [well, setWell] = useState(freshWell());
+  const [activity, setActivity] = useState(freshActivity());
+  const [page, setPage] = useState('login');
+
   const stateRef = useRef({ model, well, activity });
   stateRef.current = { model, well, activity };
 
-  const activeIndex = Math.max(0, NAV_ITEMS.findIndex((item) => item.id === page));
+  // ── All hooks must be called unconditionally before any early return ──
+  const loadWellData = useCallback((wellData) => {
+    if (!wellData) return;
+    setModel(wellData.model || freshModel());
+    setWell({ ...INITIAL_WELL, ...wellData.well, boreholeImages: wellData.well?.boreholeImages || {} });
+    setActivity(wellData.activity || freshActivity());
+  }, []);
 
-  const saveAll = (message = 'Data berhasil disimpan di browser ini.') => {
+  const saveWellData = useCallback((message = 'Data berhasil disimpan.') => {
     const current = stateRef.current;
-    persist(current.model, current.well, current.activity);
-    try {
-      localStorage.setItem('wellData', JSON.stringify({
-        ...current.well,
-        activityImages: current.activity,
-        visualization: current.model,
-        timestamp: new Date().toISOString(),
-      }));
-    } catch {
-      // Penyimpanan penuh: data tetap aman di memori.
+    saveActiveWellData({
+      well: current.well,
+      model: current.model,
+      activity: current.activity,
+    });
+    projectNotify(message, 'success');
+  }, [saveActiveWellData, projectNotify]);
+
+  useEffect(() => {
+    if (activeWellId) {
+      const wellData = loadActiveWellData();
+      loadWellData(wellData);
+    } else {
+      setModel(freshModel());
+      setWell(freshWell());
+      setActivity(freshActivity());
     }
-    notify(message, 'success');
+  }, [activeWellId, loadActiveWellData, loadWellData]);
+
+  useEffect(() => {
+    const current = stateRef.current;
+    // Guard: only persist when there is an active well. Note activeWellId is
+    // intentionally NOT a dependency: when the user switches wells, the load
+    // effect above replaces model/well/activity first, and this effect then
+    // persists the (new) active well's data — never the previous well's data.
+    if (activeWellId) {
+      saveActiveWellData({
+        model: current.model,
+        well: current.well,
+        activity: current.activity,
+      });
+    }
+  }, [model, well, activity, saveActiveWellData]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 6);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Layar menengah: sidebar otomatis menjadi rail ikon agar konten tetap lega.
+  useEffect(() => {
+    const mq = window.matchMedia(RAIL_QUERY);
+    const onChange = (e) => { if (e.matches) setRailCollapsed(true); };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setDrawerOpen(false); };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [drawerOpen]);
+
+  // ── Status otentikasi — hitung setelah semua hook ──
+  // Tentukan halaman yang ditampilkan berdasarkan status otentikasi.
+  let displayPage = page;
+  if (!isAuthenticated) {
+    // Belum login: langsung tampilkan Login (register tetap bisa diakses).
+    displayPage = page === 'register' ? 'register' : 'login';
+  } else {
+    switch (user?.status) {
+      case 'pending':
+        displayPage = 'pending';
+        break;
+      case 'rejected':
+        displayPage = 'rejected';
+        break;
+      case 'suspended':
+        displayPage = 'suspended';
+        break;
+      case 'approved':
+        // Sudah login membuka halaman login/daftar → diarahkan ke Dashboard.
+        if (page === 'login' || page === 'register') {
+          displayPage = 'dashboard';
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Sinkronkan state `page` agar sidebar/nav konsisten dengan halaman yang ditampilkan.
+  useEffect(() => {
+    if (authLoading) return;
+    if (displayPage !== page) {
+      setPage(displayPage);
+    }
+  }, [authLoading, displayPage, page]);
+
+  if (authLoading) {
+    return (
+      <div className="app loading">
+        <div className="loading-screen">
+          <div className="loading-spinner" />
+          <p>Memuat sesi...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const changePage = (id) => {
+    if (id === page) return;
+    setPage(id);
+    setDrawerOpen(false);
+    if (id === 'projects') {
+      setViewMode('list');
+      setSelectedProjectId(null);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetAll = async () => {
     const ok = await confirm({
-      title: 'Reset semua data?',
-      message: 'Visualisasi pipa, data sumur, dan seluruh foto dokumentasi akan dihapus dari browser ini.',
+      title: 'Reset semua data sumur ini?',
+      message: 'Visualisasi pipa, data sumur, dan seluruh foto dokumentasi untuk sumur aktif akan dihapus.',
       confirmLabel: 'Reset semua',
     });
     if (!ok) return;
-    setModel({ pipes: [], ground: null, mat: null, screens: [], openHole: null });
+    setModel(freshModel());
     setWell(freshWell());
-    setActivity(makeEmptyActivity());
-    notify('Semua data telah direset.', 'success');
+    setActivity(freshActivity());
+    saveWellData('Semua data sumur telah direset.');
   };
 
   const resetWell = async () => {
@@ -65,7 +247,7 @@ export default function App() {
     });
     if (!ok) return;
     setWell(freshWell());
-    notify('Data sumur bor telah direset.', 'success');
+    saveWellData('Data sumur bor telah direset.');
   };
 
   const resetActivity = async () => {
@@ -75,97 +257,250 @@ export default function App() {
       confirmLabel: 'Reset foto',
     });
     if (!ok) return;
-    setActivity(makeEmptyActivity());
-    notify('Dokumentasi kegiatan telah direset.', 'success');
+    setActivity(freshActivity());
+    saveWellData('Dokumentasi kegiatan telah direset.');
   };
 
   const downloadPdf = async () => {
-    if (!model.pipes.length) return notify('Buat pipa terlebih dahulu sebelum mengunduh PDF.', 'warning');
+    // Check if there's any construction data (legacy pipes or Designer components)
+    const wellData = loadActiveWellData();
+    const hasDesignerData = wellData?.model?.designer?.components?.length > 0;
+    const hasLegacyData = model.pipes.length > 0;
+    if (!hasDesignerData && !hasLegacyData) {
+      return projectNotify('Buat pipa atau desain konstruksi terlebih dahulu sebelum mengunduh PDF.', 'warning');
+    }
     setIsDownloading(true);
     try {
-      await downloadBoreholePdf({ model, well, activity, canvas: canvasRef.current });
-      notify('PDF berhasil diunduh.', 'success');
+      // Pass designer state from storage (includes autosaved changes)
+      const designer = wellData?.model?.designer || null;
+      const geology = wellData?.model?.geologicalLog || null;
+      await downloadBoreholePdf({ model, well, activity, canvas: canvasRef.current, project: activeProject, designer, geology });
+      projectNotify('PDF berhasil diunduh.', 'success');
     } catch (error) {
       console.error(error);
-      notify('Gagal membuat PDF. Coba lagi dengan foto yang lebih kecil.', 'error');
+      projectNotify('Gagal membuat PDF. Coba lagi dengan foto yang lebih kecil.', 'error');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  useEffect(() => {
-    const current = stateRef.current;
-    persist(current.model, current.well, current.activity);
-  }, [model, well, activity, persist]);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 6);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const changePage = (id) => {
-    if (id === page) return;
-    setPage(id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleProjectSelect = (projectId) => {
+    setSelectedProjectId(projectId);
+    setViewMode('detail');
+    selectProject(projectId);
   };
 
+  const handleWellSelect = (wellId) => {
+    selectWell(wellId);
+    if (page !== 'visualisasi' && page !== 'data' && page !== 'docs') {
+      changePage('visualisasi');
+    }
+  };
+
+  const toast = projectToast;
+
+  if (projectLoading) {
+    return (
+      <div className="app loading">
+        <div className="loading-screen">
+          <div className="loading-spinner" />
+          <p>Memuat proyek...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Halaman autentikasi — tidak pernah dirender sebagai child dari AppShell ───
+  if (!isAuthenticated) {
+    return (
+      <AuthLayout>
+        {displayPage === 'register' ? <RegisterPage /> : <LoginPage />}
+      </AuthLayout>
+    );
+  }
+
+  // ─── Halaman status akun — tidak pernah dirender sebagai child dari AppShell ───
+  switch (user?.status) {
+    case 'pending':
+      return <AuthLayout><PendingApprovalPage /></AuthLayout>;
+    case 'rejected':
+      return <AuthLayout><RejectedAccountPage /></AuthLayout>;
+    case 'suspended':
+      return <AuthLayout><SuspendedAccountPage /></AuthLayout>;
+    default:
+      break;
+  }
+
+  // ─── APPROVED → AppShell + halaman engineering ───
   return (
-    <div className="app">
-      <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
-        <div className="topbar-inner">
-          <div className="brand">
-            <span className="brand-mark"><img src={logo} alt="" width="26" height="26" /></span>
-            <span className="brand-text">
-              <strong>Sumur Bor</strong>
-              <small>Visualisasi konstruksi</small>
-            </span>
+    <AppShell
+      page={page}
+      setPage={setPage}
+      drawerOpen={drawerOpen}
+      setDrawerOpen={setDrawerOpen}
+      railCollapsed={railCollapsed}
+      setRailCollapsed={setRailCollapsed}
+      selectedProjectId={selectedProjectId}
+      setSelectedProjectId={setSelectedProjectId}
+      viewMode={viewMode}
+      setViewMode={setViewMode}
+      user={user}
+      logout={logout}
+      isAuthenticated={isAuthenticated}
+      activeProject={activeProject}
+      activeWell={activeWell}
+      activeWellId={activeWellId}
+      notify={projectNotify}
+      toast={toast}
+      setProjectToast={setProjectToast}
+      confirmDialog={confirmDialog}
+      isDownloading={isDownloading}
+      downloadPdf={downloadPdf}
+      resetAll={resetAll}
+      canvasRef={canvasRef}
+    >
+      <ErrorBoundary>
+        {/* Auth pages (rendered only when approved opens login/register → redirected to dashboard above) */}
+        {displayPage === 'login' && <LoginPage />}
+        {displayPage === 'register' && <RegisterPage />}
+        {displayPage === 'pending' && <PendingApprovalPage />}
+        {displayPage === 'rejected' && <RejectedAccountPage />}
+        {displayPage === 'suspended' && <SuspendedAccountPage />}
+        {displayPage === 'admin-approval' && <AdminApprovalPage />}
+
+        <div className={`page ${page === 'dashboard' ? 'is-active' : ''}`} id="dashboard">
+          <DashboardPage onNavigate={changePage} />
+        </div>
+
+      <div className={`page ${page === 'project-docs' ? 'is-active' : ''}`} id="project-docs">
+        {activeProjectId ? (
+          <ProjectDocumentationPage notify={projectNotify} />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <FileText size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada proyek aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat proyek dari halaman Proyek untuk mengelola dokumentasi proyek.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek</Button>
           </div>
+        )}
+      </div>
 
-          <nav className="seg seg-3 nav-desktop" style={{ '--i': activeIndex }} aria-label="Halaman">
-            <i className="seg-ind" aria-hidden="true" />
-            {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-              <button key={id} id={`nav-${id}`} type="button" className={page === id ? 'is-active' : ''} onClick={() => changePage(id)} aria-current={page === id ? 'page' : undefined}>
-                <Icon size={16} strokeWidth={2} /><span>{label}</span>
-              </button>
-            ))}
-          </nav>
+      {viewMode === 'list' && displayPage === 'projects' && (
+        <ProjectsPage />
+      )}
 
-          <div className="topbar-actions">
-            <Button variant="ghost" icon={RotateCcw} onClick={resetAll} className="hide-sm" aria-label="Reset semua">Reset</Button>
-            <Button variant="primary" icon={Download} loading={isDownloading} onClick={downloadPdf}>
-              <span className="hide-xs">{isDownloading ? 'Menyiapkan…' : 'Unduh PDF'}</span>
-              <span className="show-xs">PDF</span>
-            </Button>
-            <Button variant="ghost" icon={RotateCcw} onClick={resetAll} className="icon-only show-sm" aria-label="Reset semua" />
+      {viewMode === 'detail' && selectedProjectId && (
+        <ProjectDetailPage projectId={selectedProjectId} />
+      )}
+
+      <div className={`page ${page === 'visualisasi' ? 'is-active' : ''}`} id="visualisasi">
+        {activeWellId ? (
+          <VisualizationPage model={model} setModel={setModel} canvasRef={canvasRef} notify={projectNotify} />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <Ruler size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai visualisasi.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
           </div>
-        </div>
-      </header>
+        )}
+      </div>
 
-      <main className="main">
-        <div className={`page ${page === 'page1' ? 'is-active' : ''}`} id="page1">
-          <VisualizationPage model={model} setModel={setModel} canvasRef={canvasRef} notify={notify} />
-        </div>
-        <div className={`page ${page === 'page2' ? 'is-active' : ''}`} id="page2">
-          <DataPage well={well} setWell={setWell} notify={notify} onSave={() => saveAll('Data sumur bor berhasil disimpan.')} onReset={resetWell} />
-        </div>
-        <div className={`page ${page === 'page3' ? 'is-active' : ''}`} id="page3">
-          <DocsPage activity={activity} setActivity={setActivity} notify={notify} onSave={() => saveAll('Dokumentasi kegiatan berhasil disimpan.')} onReset={resetActivity} />
-        </div>
-      </main>
+      <div className={`page ${page === 'desain' ? 'is-active' : ''}`} id="desain">
+        {activeWellId ? (
+          <DesignerPage notify={projectNotify} />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <RotateCcw size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai desain konstruksi.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
+          </div>
+        )}
+      </div>
 
-      <nav className="tabbar" style={{ '--i': activeIndex }} aria-label="Navigasi utama">
-        <i className="tabbar-ind" aria-hidden="true" />
-        {NAV_ITEMS.map(({ id, short, icon: Icon }) => (
-          <button key={id} type="button" className={page === id ? 'is-active' : ''} onClick={() => changePage(id)} aria-current={page === id ? 'page' : undefined}>
-            <Icon size={21} strokeWidth={1.9} /><span>{short}</span>
-          </button>
-        ))}
-      </nav>
+      <div className={`page ${page === 'data' ? 'is-active' : ''}`} id="data">
+        {activeWellId ? (
+          <DataPage well={well} setWell={setWell} notify={projectNotify} onSave={() => saveWellData('Data sumur bor berhasil disimpan.')} onReset={resetWell} />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <ClipboardList size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk mengisi data.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
+          </div>
+        )}
+      </div>
 
-      <Toast toast={toast} onClose={() => setToast(null)} />
-      {confirmDialog}
-    </div>
+      <div className={`page ${page === 'docs' ? 'is-active' : ''}`} id="docs">
+        {activeWellId ? (
+          <DocsPage activity={activity} setActivity={setActivity} notify={projectNotify} onSave={() => saveWellData('Dokumentasi kegiatan berhasil disimpan.')} onReset={resetActivity} />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <Images size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk menambah dokumentasi.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
+          </div>
+        )}
+      </div>
+
+      <div className={`page ${page === 'documentation' ? 'is-active' : ''}`} id="documentation">
+        {activeWellId ? (
+          <DocumentationPage notify={projectNotify} />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <FileText size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk mengelola galeri foto dan dokumen.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
+          </div>
+        )}
+      </div>
+
+      <div className={`page ${page === 'geology' ? 'is-active' : ''}`} id="geology">
+        {activeWellId ? (
+          <GeologyPage />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <Layers size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai log geologi.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
+          </div>
+        )}
+      </div>
+
+      <div className={`page ${page === 'monitoring' ? 'is-active' : ''}`} id="monitoring">
+        {activeWellId ? (
+          <MonitoringPage />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <Droplets size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai monitoring air tanah.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
+          </div>
+        )}
+      </div>
+
+      <div className={`page ${page === 'reports' ? 'is-active' : ''}`} id="reports">
+        {activeWellId ? (
+          <ReportBuilderPage notify={projectNotify} />
+        ) : (
+          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <Download size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
+            <h3>Belum ada sumur aktif</h3>
+            <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk membuat laporan penyelesaian.</p>
+            <Button variant="primary" icon={FilePlus} onClick={() => { setViewMode('list'); changePage('projects'); }}>Kelola Proyek & Sumur</Button>
+          </div>
+        )}
+      </div>
+
+      <div className={`page ${page === 'data-management' ? 'is-active' : ''}`} id="data-management">
+        <DataManagementPage />
+      </div>
+      </ErrorBoundary>
+    </AppShell>
   );
 }

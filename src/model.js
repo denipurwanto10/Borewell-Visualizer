@@ -4,6 +4,7 @@ export const EMPTY_MODEL = {
   mat: null,
   screens: [],
   openHole: null,
+  geologicalLog: null,
 };
 
 export const INITIAL_WELL = {
