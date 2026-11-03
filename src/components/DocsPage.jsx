@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Camera, Plus, RotateCcw, Save, X } from 'lucide-react';
 import { Button, PageHead } from './Primitives';
 import { ACTIVITY_KEYS } from '../model';
@@ -50,10 +50,6 @@ function Category({ index, id, items, onFiles, onRemove }) {
 }
 
 export default function DocsPage({ activity, setActivity, notify, onSave, onReset }) {
-  useEffect(() => {
-    onSave?.();
-  }, [activity]);
-
   const onFiles = async (files, key) => {
     if (!files.length) return;
     const current = activity[key] || [];
