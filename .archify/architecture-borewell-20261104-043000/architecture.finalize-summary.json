@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\Website\\visualisasi_pipa\\.archify\\architecture-borewell-20261104-043000\\candidate.json",
+    "sha256": "7853f2b8c167344a7d5e4921b688321fcc06dcb077098c89383937bf59585ef3",
+    "bytes": 8831
+  },
+  "artifact": {
+    "path": "C:\\Website\\visualisasi_pipa\\.archify\\architecture-borewell-20261104-043000\\architecture.html",
+    "sha256": "4ff5aad9f1e6f4af4f3e851cc150e20482c80be7a7be7561b81db84f5bd49167",
+    "bytes": 874438
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Website\\visualisasi_pipa\\.archify\\architecture-borewell-20261104-043000\\architecture.finalize.json",
+    "summaryReceipt": "C:\\Website\\visualisasi_pipa\\.archify\\architecture-borewell-20261104-043000\\architecture.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Website\\visualisasi_pipa\\.archify\\architecture-borewell-20261104-043000\\architecture.browser-check.json"
+  },
+  "update": {
+    "status": "update_available",
+    "installedVersion": "3.1.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": "https://github.com/tt-a1i/archify/releases/tag/v3.2.0",
+    "severity": "normal",
+    "checkedAt": "2026-11-03T21:24:27.213Z",
+    "source": "cache",
+    "noticeRequired": true,
+    "noticeText": "Archify update: 3.1.0 → 3.2.0. A previous check at 2026-11-03T21:24:27.213Z found a newer release. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.2.0. The installed Skill has not changed; ask to snooze or ignore this reminder.",
+    "eventKey": "archify@sha256:70e210265c59f24dcbdf2a502ff671104b5454e7ee7d3554aecd86bad32384f5"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 8780,
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 39,
+      "routesOverSuggestedBends": 5,
+      "routesOverSuggestedStretch": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "from": "react",
+            "to": "project-ctx",
+            "label": "",
+            "collectionIndex": 2,
+            "artifactIndex": 3
+          },
+          "right": {
+            "from": "auth-ctx",
+            "to": "localstorage",
+            "label": "",
+            "collectionIndex": 15,
+            "artifactIndex": 16
+          },
+          "point": [
+            416,
+            233
+          ]
+        },
+        {
+          "left": {
+            "from": "react",
+            "to": "shell",
+            "label": "",
+            "collectionIndex": 3,
+            "artifactIndex": 4
+          },
+          "right": {
+            "from": "auth-ctx",
+            "to": "api-client",
+            "label": "",
+            "collectionIndex": 13,
+            "artifactIndex": 14
+          },
+          "point": [
+            624,
+            180
+          ]
+        },
+        {
+          "left": {
+            "from": "react",
+            "to": "shell",
+            "label": "",
+            "collectionIndex": 3,
+            "artifactIndex": 4
+          },
+          "right": {
+            "from": "auth-ctx",
+            "to": "localstorage",
+            "label": "",
+            "collectionIndex": 15,
+            "artifactIndex": 16
+          },
+          "point": [
+            416,
+            180
+          ]
+        },
+        {
+          "left": {
+            "from": "pages",
+            "to": "dashboard",
+            "label": "",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "right": {
+            "from": "pages",
+            "to": "designer",
+            "label": "",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "point": [
+            1020,
+            264
+          ],
+          "sharedNode": "pages"
+        },
+        {
+          "left": {
+            "from": "pages",
+            "to": "projects",
+            "label": "",
+            "collectionIndex": 6,
+            "artifactIndex": 7
+          },
+          "right": {
+            "from": "pages",
+            "to": "designer",
+            "label": "",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "point": [
+            1020,
+            500
+          ],
+          "sharedNode": "pages"
+        },
+        {
+          "left": {
+            "from": "pages",
+            "to": "geology",
+            "label": "",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "right": {
+            "from": "pages",
+            "to": "monitoring",
+            "label": "",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "point": [
+            934,
+            726
+          ],
+          "sharedNode": "pages"
+        },
+        {
+          "left": {
+            "from": "pages",
+            "to": "geology",
+            "label": "",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "right": {
+            "from": "designer",
+            "to": "localstorage",
+            "label": "",
+            "collectionIndex": 18,
+            "artifactIndex": 19
+          },
+          "point": [
+            920,
+            620
+          ]
+        },
+        {
+          "left": {
+            "from": "pages",
+            "to": "monitoring",
+            "label": "",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "right": {
+            "from": "designer",
+            "to": "localstorage",
+            "label": "",
+            "collectionIndex": 18,
+            "artifactIndex": 19
+          },
+          "point": [
+            934,
+            620
+          ]
+        }
+      ],
+      "detours": [
+        {
+          "relationship": {
+            "from": "geology",
+            "to": "localstorage",
+            "label": "",
+            "collectionIndex": 19,
+            "artifactIndex": 20
+          },
+          "bends": 3,
+          "stretch": 1.037
+        },
+        {
+          "relationship": {
+            "from": "monitoring",
+            "to": "localstorage",
+            "label": "",
+            "collectionIndex": 20,
+            "artifactIndex": 21
+          },
+          "bends": 3,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "from": "datamgmt",
+            "to": "localstorage",
+            "label": "",
+            "collectionIndex": 21,
+            "artifactIndex": 22
+          },
+          "bends": 3,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "from": "postgres",
+            "to": "rls",
+            "label": "",
+            "collectionIndex": 32,
+            "artifactIndex": 33
+          },
+          "bends": 4,
+          "stretch": 1.495,
+          "directCorridorBlockers": [
+            {
+              "id": "migrations",
+              "label": "13 Migrations",
+              "box": [
+                1040,
+                1660,
+                160,
+                80
+              ]
+            }
+          ]
+        },
+        {
+          "relationship": {
+            "from": "bootstrap-cli",
+            "to": "postgres",
+            "label": "",
+            "collectionIndex": 36,
+            "artifactIndex": 37
+          },
+          "bends": 3,
+          "stretch": 1
+        }
+      ],
+      "truncated": true
+    },
+    "hints": [
+      "localstorage has 6 relationships facing its right side, which fits 4 ports: make that side at least 102px, or move some of those neighbours so they face another side of localstorage.",
+      "postgres has 5 relationships facing its left side, which fits 4 ports: make that side at least 88px, or move some of those neighbours so they face another side of postgres.",
+      "react → project-ctx crosses auth-ctx → localstorage: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "react → shell crosses auth-ctx → api-client: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "react → shell crosses auth-ctx → localstorage: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "pages → dashboard and pages → designer cross next to pages: move node dashboard or designer so the two reach pages from different sides (for example one level with it, one directly above or below it).",
+      "pages → projects and pages → designer cross next to pages: move node projects or designer so the two reach pages from different sides (for example one level with it, one directly above or below it).",
+      "pages → geology and pages → monitoring cross next to pages: move node geology or monitoring so the two reach pages from different sides (for example one level with it, one directly above or below it)."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}

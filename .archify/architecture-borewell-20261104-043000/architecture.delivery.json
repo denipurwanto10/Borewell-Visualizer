@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "727057bd-5eb2-4366-91b4-8e5e70feb71d",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "C:\\Website\\visualisasi_pipa\\.archify\\architecture-borewell-20261104-043000\\candidate.json",
+  "output": "C:\\Website\\visualisasi_pipa\\.archify\\architecture-borewell-20261104-043000\\architecture.html",
+  "specification": {
+    "sha256": "7853f2b8c167344a7d5e4921b688321fcc06dcb077098c89383937bf59585ef3",
+    "bytes": 8831
+  },
+  "artifact": {
+    "sha256": "4ff5aad9f1e6f4af4f3e851cc150e20482c80be7a7be7561b81db84f5bd49167",
+    "bytes": 874438
+  }
+}

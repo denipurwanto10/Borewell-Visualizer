@@ -1,0 +1,21 @@
+- main "Halaman autentikasi" [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - heading "Masuk" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Masuk ke akun Borewell Engineering Visualizer Anda.
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - text: Email
+        - textbox "nama@contoh.com" [ref=e11]
+        - alert [ref=e12]: Email wajib diisi.
+      - generic [ref=e13]:
+        - text: Password
+        - generic [ref=e14]:
+          - textbox "••••••••••••" [ref=e15]
+          - button "Tampilkan password" [ref=e16] [cursor=pointer]
+        - alert [ref=e20]: Password wajib diisi.
+      - button "Masuk" [ref=e21] [cursor=pointer]
+    - paragraph [ref=e24]:
+      - text: Belum punya akun?
+      - link "Daftar sekarang" [ref=e25] [cursor=pointer]:
+        - /url: /register
