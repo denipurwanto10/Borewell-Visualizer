@@ -96,6 +96,7 @@ export default function App() {
   const [page, setPage] = useState(() => (
     typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/register' ? 'register' : 'login'
   ));
+  const [wellHydrated, setWellHydrated] = useState(false);
 
   const stateRef = useRef({ model, well, activity });
   stateRef.current = { model, well, activity };
@@ -106,6 +107,7 @@ export default function App() {
     setModel(wellData.model || freshModel());
     setWell({ ...INITIAL_WELL, ...wellData.well, boreholeImages: wellData.well?.boreholeImages || {} });
     setActivity(wellData.activity || freshActivity());
+    setWellHydrated(true);
   }, []);
 
   const saveWellData = useCallback((message = 'Data berhasil disimpan.') => {
@@ -119,30 +121,37 @@ export default function App() {
   }, [saveActiveWellData, projectNotify]);
 
   useEffect(() => {
+    let cancelled = false;
     if (activeWellId) {
-      const wellData = loadActiveWellData();
-      loadWellData(wellData);
+      setWellHydrated(false);
+      (async () => {
+        const wellData = await loadActiveWellData();
+        if (!cancelled) loadWellData(wellData);
+      })();
     } else {
       setModel(freshModel());
       setWell(freshWell());
       setActivity(freshActivity());
+      setWellHydrated(false);
     }
+    return () => { cancelled = true; };
   }, [activeWellId, loadActiveWellData, loadWellData]);
 
   useEffect(() => {
     const current = stateRef.current;
-    // Guard: only persist when there is an active well. Note activeWellId is
-    // intentionally NOT a dependency: when the user switches wells, the load
-    // effect above replaces model/well/activity first, and this effect then
-    // persists the (new) active well's data — never the previous well's data.
-    if (activeWellId) {
+    // Guard: only persist when there is an active well AND initial hydration is complete.
+    // This prevents saving empty/default data on mount before the API returns well data.
+    // Note: activeWellId is intentionally NOT a dependency — when the user switches wells,
+    // the load effect above replaces model/well/activity first, then this effect persists
+    // the new well's data (never the previous well's data).
+    if (activeWellId && wellHydrated) {
       saveActiveWellData({
         model: current.model,
         well: current.well,
         activity: current.activity,
       });
     }
-  }, [model, well, activity, saveActiveWellData]);
+  }, [model, well, activity, saveActiveWellData, activeWellId, wellHydrated]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 6);
