@@ -6,49 +6,47 @@ Fixed a bug where the error toast "Gagal menyimpan data. Coba lagi." appeared un
 - Immediately after successful login
 - Without any user-initiated save action
 
-## Root Cause
+## Root Causes (Two Issues)
 
-**File:** `src/App.jsx` — autosave effect (lines 132–145)
+### Issue 1: Autosave Race Condition (Fixed in commit `e7c0db0`)
+**File:** `src/App.jsx` — autosave effect
 
-The autosave `useEffect` had dependencies `[model, well, activity, saveActiveWellData]` and a guard `if (activeWellId)`. On initial page load:
+The autosave `useEffect` fired on initial render with empty/default data before `loadActiveWellData()` could hydrate real data from the API.
 
-1. **App mounts** with initial state: `model=EMPTY_MODEL`, `well=INITIAL_WELL`, `activity=makeEmptyActivity()`
-2. **ProjectContext** loads projects from API and sets `activeWellId` from localStorage (previous session)
-3. **Autosave effect runs on first render** because `model`/`well`/`activity` are in its dependency array
-4. Since `activeWellId` is already truthy (from localStorage), the effect calls `saveActiveWellData()` with **empty/default data**
-5. This sends empty data to multiple APIs:
-   - `wellAPI.update()` — well record
-   - `designerAPI.upsert()` — designer components/config
-   - `geologyAPI.upsert()` — geological layers
-   - `monitoringAPI.upsert()` — monitoring measurements
-6. Backend rejects empty/invalid payloads → 4xx errors → toast "Gagal menyimpan data. Coba lagi."
+### Issue 2: Snake_case / camelCase Mismatch (Fixed in this commit)
+**File:** `src/context/ProjectContext.jsx` — `loadActiveWellData()` function
 
-**Key issue:** The effect fired *before* `loadActiveWellData()` could hydrate real data from the API.
+The `loadActiveWellData()` function returned raw API data (snake_case: `well_name`, `well_type`, `planned_depth`, etc.) but `saveActiveWellData()` expects camelCase (`wellName`, `wellType`, `plannedDepth`, etc.). When autosave ran after hydration, it sent `undefined` values for all well fields, causing the backend to reject the request with a 400 validation error.
+
+### Issue 3: Un-awaited Async Calls in Page Components
+**Files:** `src/components/DesignerPage.jsx`, `src/components/GeologyPage.jsx`, `src/components/MonitoringPage.jsx`
+
+These pages called `loadActiveWellData()` without `await`, receiving a Promise instead of resolved data. This prevented proper data loading (though didn't directly cause the toast).
 
 ## Fix Applied
 
+### 1. Hydration Guard (commit `e7c0db0`)
 **File:** `src/App.jsx`
+- Added `wellHydrated` state to track when initial well data has loaded
+- Guarded autosave with `activeWellId && wellHydrated`
+- Fixed async loading with proper `await` and cleanup
 
-1. **Added hydration state** — `wellHydrated` boolean tracking whether initial well data has loaded from the API.
-2. **Guarded autosave** — Effect now requires `activeWellId && wellHydrated` before persisting.
-3. **Fixed async loading** — `loadActiveWellData()` is async; now properly `await`ed with cleanup to handle well switching.
-4. **Reset hydration on well change** — When `activeWellId` changes, `wellHydrated` resets to `false` until new data loads.
+### 2. Well Data Normalization (this commit)
+**File:** `src/context/ProjectContext.jsx`
+- Added normalization in `loadActiveWellData()` to convert API snake_case to frontend camelCase
+- Maps: `well_code` → `wellCode`, `well_name` → `wellName`, `well_type` → `wellType`, `planned_depth` → `plannedDepth`, etc.
 
-### Changes
-
-| Location | Change |
-|----------|--------|
-| Line 99 | Added `const [wellHydrated, setWellHydrated] = useState(false);` |
-| Line 110 | `setWellHydrated(true)` after data loads in `loadWellData` |
-| Lines 123–138 | Load effect: reset hydration, await `loadActiveWellData()`, cleanup on unmount/well change |
-| Lines 140–154 | Autosave effect: added `wellHydrated` guard and dependency |
+### 3. Fixed Async/Await in Page Components (this commit)
+**Files:** `src/components/DesignerPage.jsx`, `src/components/GeologyPage.jsx`, `src/components/MonitoringPage.jsx`
+- Changed load effects to properly `await loadActiveWellData()`
+- Added cleanup functions to handle well switching
 
 ## Verification
 
 ### Build
 ```bash
 npm run build
-# ✓ built in 41.57s
+# ✓ built in 29.60s
 ```
 
 ### Frontend Tests (Vitest)
@@ -86,7 +84,11 @@ go vet ./...
 | Logout | ✅ No background save | ✅ No background save |
 
 ## Files Changed
-- `src/App.jsx` — Added hydration guard and fixed async loading in autosave lifecycle
+- `src/App.jsx` — Added hydration guard and fixed async loading in autosave lifecycle (commit `e7c0db0`)
+- `src/context/ProjectContext.jsx` — Normalize well data from API snake_case to camelCase
+- `src/components/DesignerPage.jsx` — Properly await `loadActiveWellData()` with cleanup
+- `src/components/GeologyPage.jsx` — Properly await `loadActiveWellData()` with cleanup
+- `src/components/MonitoringPage.jsx` — Properly await `loadActiveWellData()` with cleanup
 
 ## Remaining Limitations
 - The autosave still runs on every `model`/`well`/`activity` change after hydration. This is intentional for real-time persistence.

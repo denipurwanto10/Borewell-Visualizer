@@ -58,40 +58,45 @@ export default function DesignerPage({ notify }) {
 
   // Load designer state when active well changes
   useEffect(() => {
+    let cancelled = false;
     if (!activeWellId) {
       setDesigner(emptyDesigner());
       if (history) history.clear();
       return;
     }
-    const data = loadActiveWellData();
-    const wellData = data || {};
-    
-    // Check if Designer data exists
-    const designerExists = hasDesignerData(wellData);
-    const legacyExists = hasLegacyData(wellData);
-    
-    let next;
-    if (designerExists) {
-      // Use existing Designer data
-      const saved = wellData.model?.designer || wellData.designer;
-      next = normalizeDesigner(saved);
-    } else if (legacyExists) {
-      // Migrate from legacy model
-      const legacyModel = wellData.model || {};
-      const migrated = legacyToDesigner(legacyModel);
-      next = normalizeDesigner(migrated);
-    } else {
-      // Start fresh
-      next = emptyDesigner();
-    }
-    
-    setDesigner(next);
-    if (history) {
-      history.clear();
-      history.push(next);
-    }
-    setDirty(false);
-    setSelectedId(null);
+    (async () => {
+      const data = await loadActiveWellData();
+      if (cancelled) return;
+      const wellData = data || {};
+      
+      // Check if Designer data exists
+      const designerExists = hasDesignerData(wellData);
+      const legacyExists = hasLegacyData(wellData);
+      
+      let next;
+      if (designerExists) {
+        // Use existing Designer data
+        const saved = wellData.model?.designer || wellData.designer;
+        next = normalizeDesigner(saved);
+      } else if (legacyExists) {
+        // Migrate from legacy model
+        const legacyModel = wellData.model || {};
+        const migrated = legacyToDesigner(legacyModel);
+        next = normalizeDesigner(migrated);
+      } else {
+        // Start fresh
+        next = emptyDesigner();
+      }
+      
+      setDesigner(next);
+      if (history) {
+        history.clear();
+        history.push(next);
+      }
+      setDirty(false);
+      setSelectedId(null);
+    })();
+    return () => { cancelled = true; };
   }, [activeWellId, loadActiveWellData, history]);
 
   // Compute derived values

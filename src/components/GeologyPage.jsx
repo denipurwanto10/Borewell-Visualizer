@@ -27,6 +27,7 @@ export default function GeologyPage() {
 
   // Load geology when active well changes
   useEffect(() => {
+    let cancelled = false;
     if (!activeWellId) {
       setGeology(emptyGeology());
       setDirty(false);
@@ -35,13 +36,17 @@ export default function GeologyPage() {
       setForm(null);
       return;
     }
-    const data = loadActiveWellData() || {};
-    const saved = data?.model?.geologicalLog ?? data?.geologicalLog ?? null;
-    setGeology(normalizeGeology(saved));
-    setDirty(false);
-    setSelectedId(null);
-    setEditingId(null);
-    setForm(null);
+    (async () => {
+      const data = await loadActiveWellData();
+      if (cancelled) return;
+      const saved = data?.model?.geologicalLog ?? data?.geologicalLog ?? null;
+      setGeology(normalizeGeology(saved));
+      setDirty(false);
+      setSelectedId(null);
+      setEditingId(null);
+      setForm(null);
+    })();
+    return () => { cancelled = true; };
   }, [activeWellId, loadActiveWellData]);
 
   // Handle body scroll lock for tablet form drawer

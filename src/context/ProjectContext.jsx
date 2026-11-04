@@ -611,8 +611,30 @@ export function ProjectProvider({ children }) {
         const geologyRes = await geologyAPI.get(activeWellId).catch(() => ({ data: { version: 1, layers: [] } }));
         const monitoringRes = await monitoringAPI.get(activeWellId).catch(() => ({ data: { version: 1, measurements: [] } }));
 
+        // Normalize API well data (snake_case) to frontend camelCase
+        const w = wellRes.data || {};
+        const normalizedWell = {
+          id: w.id,
+          wellCode: w.well_code,
+          wellName: w.well_name,
+          wellType: w.well_type,
+          location: w.location || '',
+          latitude: w.latitude || '',
+          longitude: w.longitude || '',
+          plannedDepth: w.planned_depth != null ? String(w.planned_depth) : '',
+          actualDepth: w.actual_depth != null ? String(w.actual_depth) : '',
+          drillingDate: w.drilling_date || '',
+          completionDate: w.completion_date || '',
+          status: w.status || 'planned',
+          description: w.description || '',
+          projectId: w.project_id,
+          createdAt: w.created_at,
+          updatedAt: w.updated_at,
+          boreholeImages: w.borehole_images || {},
+        };
+
         return {
-          well: wellRes.data,
+          well: normalizedWell,
           model: {
             designer: designerRes.data || { version: 1, components: [], config: {} },
             geologicalLog: geologyRes.data || { version: 1, layers: [] },

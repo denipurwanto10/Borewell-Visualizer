@@ -34,6 +34,7 @@ export default function MonitoringPage() {
 
   // Load monitoring when active well changes
   useEffect(() => {
+    let cancelled = false;
     if (!activeWellId) {
       setMonitoring(emptyMonitoring());
       setDirty(false);
@@ -42,13 +43,17 @@ export default function MonitoringPage() {
       setForm(null);
       return;
     }
-    const data = loadActiveWellData() || {};
-    const saved = data?.model?.groundwaterMonitoring ?? data?.groundwaterMonitoring ?? null;
-    setMonitoring(normalizeMonitoring(saved));
-    setDirty(false);
-    setSelectedId(null);
-    setEditingId(null);
-    setForm(null);
+    (async () => {
+      const data = await loadActiveWellData();
+      if (cancelled) return;
+      const saved = data?.model?.groundwaterMonitoring ?? data?.groundwaterMonitoring ?? null;
+      setMonitoring(normalizeMonitoring(saved));
+      setDirty(false);
+      setSelectedId(null);
+      setEditingId(null);
+      setForm(null);
+    })();
+    return () => { cancelled = true; };
   }, [activeWellId, loadActiveWellData]);
 
   // Handle body scroll lock for tablet form drawer
