@@ -156,8 +156,71 @@ Jika refresh token lama digunakan kembali (mungkin mencurigakan):
 
 Refresh sessions tabel dilindungi oleh RLS policy `sessions_owner` yang membatasi akses berdasarkan `app.current_user_id`. Context diset per transaksi menggunakan `SET LOCAL` sebelum operasi DML.
 
+## Session Revocation Behavior
+
+### What Happens When Admin Suspends a User
+
+1. Admin calls `POST /api/v1/admin/users/{id}/suspend`
+2. `UserRepo.UpdateStatusAndRevokeSessions` runs in a transaction:
+   - Updates user status to `suspended`
+   - Revokes ALL refresh sessions for that user (sets `revoked_at = now()`)
+3. User's existing access token (JWT, 15 min TTL) remains valid until expiry
+4. On next API request with expired access token:
+   - Frontend attempts `POST /api/v1/auth/refresh`
+   - Refresh fails with 401 (session revoked)
+   - Frontend redirects to login
+
+### What Happens When Admin Changes Project Assignments
+
+1. Admin calls `PUT /api/v1/admin/projects/{id}/assignments/{userId}`
+2. Assignment permission updated in database
+3. **No immediate token invalidation** — JWT access tokens (15 min TTL) do not contain project assignment context
+4. On next API request:
+   - Access token still valid (contains only user_id, email, role)
+   - Handler checks `assignmentRepo.CanEdit()` against current database state
+   - New permission enforced immediately for write operations
+   - Read operations filtered by RLS (which uses current project assignments)
+
+### What Happens on Password Change
+
+1. User changes password
+2. `UserRepo.UpdatePassword` updates password hash
+3. All refresh sessions for user are revoked (implicitly via token family rotation on next refresh)
+4. Next refresh attempt fails, user must re-login
+
+### What Happens on Role Change (User → Admin)
+
+1. Admin updates user role in database (currently no direct API, requires manual DB update)
+2. Existing access token contains old role claim
+3. Token remains valid until 15 min expiry
+4. On next refresh, new token issued with updated role
+
+### Revocation Timing Summary
+
+| Event | Access Token Invalidated | Refresh Token Invalidated | Notes |
+|-------|-------------------------|--------------------------|-------|
+| User suspended | No (15 min TTL) | **Yes (immediate)** | Via `UpdateStatusAndRevokeSessions` |
+| Assignment changed | No (15 min TTL) | No | Handler checks DB on each write |
+| Password changed | No (15 min TTL) | Yes (on next refresh) | Token family rotation |
+| Role changed | No (15 min TTL) | No (on next refresh) | New token gets new role |
+
+### Frontend Handling of Revoked Sessions
+
+- `GET /api/v1/auth/me` returns 403 if user status is not `approved`
+- `POST /api/v1/auth/refresh` returns 401 if session revoked
+- Frontend catches 401/403 on API calls and redirects to login
+- No automatic token refresh on 403 (prevents infinite loop)
+
+### Design Rationale
+
+- **Short access token TTL (15 min)** limits exposure window for stale permissions
+- **Immediate refresh token revocation** on suspend ensures user cannot get new access tokens
+- **Handler-level permission checks** (not in token) ensure assignment changes take effect immediately for write operations
+- **RLS policies** enforce read isolation at database level
+
 ## Keterbatasan
 
 - Tidak ada email verification service (localhost-only).
 - Refresh cookie Secure=false untuk development HTTP.
 - CSRF protection menggunakan SameSite=Lax tanpa token tambahan (dievaluasi untuk production).
+- JWT access tokens stateless — tidak dicabut segera saat permission berubah (by design, 15 min TTL)

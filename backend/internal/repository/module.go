@@ -10,7 +10,10 @@ import (
 	"github.com/borewell/visualizer/backend/internal/model"
 )
 
-var ErrModuleNotFound = errors.New("module not found")
+var (
+	ErrModuleNotFound    = errors.New("module not found")
+	ErrVersionConflict   = errors.New("version conflict: record was modified by another user")
+)
 
 type ModuleRepo struct {
 	db *database.DB
@@ -63,12 +66,16 @@ func (r *ModuleRepo) UpsertDesigner(ctx context.Context, wellID, userID uuid.UUI
 			return err
 		}
 
-		_, err = r.getDesignerForUserTx(ctx, tx, wellID, userID)
+		existing, err := r.getDesignerForUserTx(ctx, tx, wellID, userID)
 		if err != nil && !errors.Is(err, ErrModuleNotFound) {
 			return err
 		}
 
 		if errors.Is(err, ErrModuleNotFound) {
+			// New record: version must be 1
+			if version != 1 {
+				return ErrVersionConflict
+			}
 			query := `
 				INSERT INTO designer_states (id, well_id, version, components, config)
 				VALUES ($1, $2, $3, $4, $5)
@@ -81,13 +88,18 @@ func (r *ModuleRepo) UpsertDesigner(ctx context.Context, wellID, userID uuid.UUI
 			return err
 		}
 
+		// Existing record: check version matches
+		if existing.Version != version {
+			return ErrVersionConflict
+		}
+
 		query := `
-			UPDATE designer_states SET version = $1, components = $2, config = $3, updated_at = now()
-			WHERE well_id = $4
+			UPDATE designer_states SET version = version + 1, components = $1, config = $2, updated_at = now()
+			WHERE well_id = $3
 			RETURNING id, well_id, version, components, config, created_at, updated_at
 		`
 		m = &model.DesignerState{}
-		err = tx.QueryRow(ctx, query, version, components, config, wellID).Scan(
+		err = tx.QueryRow(ctx, query, components, config, wellID).Scan(
 			&m.ID, &m.WellID, &m.Version, &m.Components, &m.Config, &m.CreatedAt, &m.UpdatedAt,
 		)
 		return err
@@ -158,12 +170,16 @@ func (r *ModuleRepo) UpsertGeology(ctx context.Context, wellID, userID uuid.UUID
 			return err
 		}
 
-		_, err = r.getGeologyForUserTx(ctx, tx, wellID, userID)
+		existing, err := r.getGeologyForUserTx(ctx, tx, wellID, userID)
 		if err != nil && !errors.Is(err, ErrModuleNotFound) {
 			return err
 		}
 
 		if errors.Is(err, ErrModuleNotFound) {
+			// New record: version must be 1
+			if version != 1 {
+				return ErrVersionConflict
+			}
 			query := `
 				INSERT INTO geological_logs (id, well_id, version, layers)
 				VALUES ($1, $2, $3, $4)
@@ -176,13 +192,18 @@ func (r *ModuleRepo) UpsertGeology(ctx context.Context, wellID, userID uuid.UUID
 			return err
 		}
 
+		// Existing record: check version matches
+		if existing.Version != version {
+			return ErrVersionConflict
+		}
+
 		query := `
-			UPDATE geological_logs SET version = $1, layers = $2, updated_at = now()
-			WHERE well_id = $3
+			UPDATE geological_logs SET version = version + 1, layers = $1, updated_at = now()
+			WHERE well_id = $2
 			RETURNING id, well_id, version, layers, created_at, updated_at
 		`
 		m = &model.GeologyLog{}
-		err = tx.QueryRow(ctx, query, version, layers, wellID).Scan(
+		err = tx.QueryRow(ctx, query, layers, wellID).Scan(
 			&m.ID, &m.WellID, &m.Version, &m.Layers, &m.CreatedAt, &m.UpdatedAt,
 		)
 		return err
@@ -253,12 +274,16 @@ func (r *ModuleRepo) UpsertMonitoring(ctx context.Context, wellID, userID uuid.U
 			return err
 		}
 
-		_, err = r.getMonitoringForUserTx(ctx, tx, wellID, userID)
+		existing, err := r.getMonitoringForUserTx(ctx, tx, wellID, userID)
 		if err != nil && !errors.Is(err, ErrModuleNotFound) {
 			return err
 		}
 
 		if errors.Is(err, ErrModuleNotFound) {
+			// New record: version must be 1
+			if version != 1 {
+				return ErrVersionConflict
+			}
 			query := `
 				INSERT INTO groundwater_monitoring (id, well_id, version, measurements)
 				VALUES ($1, $2, $3, $4)
@@ -271,13 +296,18 @@ func (r *ModuleRepo) UpsertMonitoring(ctx context.Context, wellID, userID uuid.U
 			return err
 		}
 
+		// Existing record: check version matches
+		if existing.Version != version {
+			return ErrVersionConflict
+		}
+
 		query := `
-			UPDATE groundwater_monitoring SET version = $1, measurements = $2, updated_at = now()
-			WHERE well_id = $3
+			UPDATE groundwater_monitoring SET version = version + 1, measurements = $1, updated_at = now()
+			WHERE well_id = $2
 			RETURNING id, well_id, version, measurements, created_at, updated_at
 		`
 		m = &model.MonitoringData{}
-		err = tx.QueryRow(ctx, query, version, measurements, wellID).Scan(
+		err = tx.QueryRow(ctx, query, measurements, wellID).Scan(
 			&m.ID, &m.WellID, &m.Version, &m.Measurements, &m.CreatedAt, &m.UpdatedAt,
 		)
 		return err

@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,11 +13,46 @@ import (
 )
 
 type ModuleHandler struct {
-	moduleRepo *repository.ModuleRepo
+	moduleRepo     *repository.ModuleRepo
+	projectRepo    *repository.ProjectRepo
+	assignmentRepo *repository.AssignmentRepo
+	wellRepo       *repository.WellRepo
 }
 
-func NewModuleHandler(moduleRepo *repository.ModuleRepo) *ModuleHandler {
-	return &ModuleHandler{moduleRepo: moduleRepo}
+func NewModuleHandler(moduleRepo *repository.ModuleRepo, projectRepo *repository.ProjectRepo, assignmentRepo *repository.AssignmentRepo, wellRepo *repository.WellRepo) *ModuleHandler {
+	return &ModuleHandler{
+		moduleRepo:     moduleRepo,
+		projectRepo:    projectRepo,
+		assignmentRepo: assignmentRepo,
+		wellRepo:       wellRepo,
+	}
+}
+
+// checkEditPermission verifies the user has EDIT permission on the project containing the well.
+// Returns true if allowed, false if forbidden (and writes 403 response).
+func (h *ModuleHandler) checkEditPermission(ctx context.Context, userID, wellID uuid.UUID, c *gin.Context) (uuid.UUID, bool) {
+	// Get well to find project ID
+	well, err := h.wellRepo.GetByIDForUser(ctx, wellID, userID)
+	if err != nil {
+		return uuid.Nil, false
+	}
+
+	// Admin bypasses permission check
+	role, _ := c.Get("user_role")
+	if role == "admin" {
+		return well.ProjectID, true
+	}
+
+	canEdit, err := h.assignmentRepo.CanEdit(ctx, userID, well.ProjectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to check permissions", c.Request.URL.Path))
+		return uuid.Nil, false
+	}
+	if !canEdit {
+		c.JSON(http.StatusForbidden, errorResponse("forbidden", "Forbidden", 403, "EDIT permission required", c.Request.URL.Path))
+		return uuid.Nil, false
+	}
+	return well.ProjectID, true
 }
 
 // Designer State
@@ -66,6 +103,11 @@ func (h *ModuleHandler) UpsertDesigner(c *gin.Context) {
 		return
 	}
 
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), wellID, c); !ok {
+		return
+	}
+
 	var req model.DesignerUpsertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, validationErrorResponse("Invalid request body", ginErrors(err), c.Request.URL.Path))
@@ -90,6 +132,10 @@ func (h *ModuleHandler) UpsertDesigner(c *gin.Context) {
 
 	state, err := h.moduleRepo.UpsertDesigner(c.Request.Context(), wellID, userID.(uuid.UUID), req.Version, components, config)
 	if err != nil {
+		if errors.Is(err, repository.ErrVersionConflict) {
+			c.JSON(http.StatusConflict, errorResponse("conflict", "Conflict", 409, "Record was modified by another user. Please refresh and try again.", c.Request.URL.Path))
+			return
+		}
 		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to save designer state", c.Request.URL.Path))
 		return
 	}
@@ -103,6 +149,11 @@ func (h *ModuleHandler) DeleteDesigner(c *gin.Context) {
 	wellID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid well ID", c.Request.URL.Path))
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), wellID, c); !ok {
 		return
 	}
 
@@ -166,6 +217,11 @@ func (h *ModuleHandler) UpsertGeology(c *gin.Context) {
 		return
 	}
 
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), wellID, c); !ok {
+		return
+	}
+
 	var req model.GeologyUpsertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, validationErrorResponse("Invalid request body", ginErrors(err), c.Request.URL.Path))
@@ -182,6 +238,10 @@ func (h *ModuleHandler) UpsertGeology(c *gin.Context) {
 
 	state, err := h.moduleRepo.UpsertGeology(c.Request.Context(), wellID, userID.(uuid.UUID), req.Version, layers)
 	if err != nil {
+		if errors.Is(err, repository.ErrVersionConflict) {
+			c.JSON(http.StatusConflict, errorResponse("conflict", "Conflict", 409, "Record was modified by another user. Please refresh and try again.", c.Request.URL.Path))
+			return
+		}
 		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to save geology log", c.Request.URL.Path))
 		return
 	}
@@ -195,6 +255,11 @@ func (h *ModuleHandler) DeleteGeology(c *gin.Context) {
 	wellID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid well ID", c.Request.URL.Path))
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), wellID, c); !ok {
 		return
 	}
 
@@ -258,6 +323,11 @@ func (h *ModuleHandler) UpsertMonitoring(c *gin.Context) {
 		return
 	}
 
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), wellID, c); !ok {
+		return
+	}
+
 	var req model.MonitoringUpsertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, validationErrorResponse("Invalid request body", ginErrors(err), c.Request.URL.Path))
@@ -274,6 +344,10 @@ func (h *ModuleHandler) UpsertMonitoring(c *gin.Context) {
 
 	state, err := h.moduleRepo.UpsertMonitoring(c.Request.Context(), wellID, userID.(uuid.UUID), req.Version, measurements)
 	if err != nil {
+		if errors.Is(err, repository.ErrVersionConflict) {
+			c.JSON(http.StatusConflict, errorResponse("conflict", "Conflict", 409, "Record was modified by another user. Please refresh and try again.", c.Request.URL.Path))
+			return
+		}
 		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to save monitoring data", c.Request.URL.Path))
 		return
 	}
@@ -287,6 +361,11 @@ func (h *ModuleHandler) DeleteMonitoring(c *gin.Context) {
 	wellID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid well ID", c.Request.URL.Path))
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), wellID, c); !ok {
 		return
 	}
 

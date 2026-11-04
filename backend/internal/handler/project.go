@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,16 +27,39 @@ func NewProjectHandler(projectRepo *repository.ProjectRepo, wellRepo *repository
 }
 
 type WellHandler struct {
-	wellRepo    *repository.WellRepo
-	projectRepo *repository.ProjectRepo
+	wellRepo      *repository.WellRepo
+	projectRepo   *repository.ProjectRepo
+	assignmentRepo *repository.AssignmentRepo
 }
 
 
-func NewWellHandler(wellRepo *repository.WellRepo, projectRepo *repository.ProjectRepo) *WellHandler {
+func NewWellHandler(wellRepo *repository.WellRepo, projectRepo *repository.ProjectRepo, assignmentRepo *repository.AssignmentRepo) *WellHandler {
 	return &WellHandler{
-		wellRepo:    wellRepo,
-		projectRepo: projectRepo,
+		wellRepo:       wellRepo,
+		projectRepo:    projectRepo,
+		assignmentRepo: assignmentRepo,
 	}
+}
+
+// checkEditPermission verifies the user has EDIT permission on the project.
+// Returns true if allowed, false if forbidden (and writes 403 response).
+func (h *WellHandler) checkEditPermission(ctx context.Context, userID, projectID uuid.UUID, c *gin.Context) bool {
+	// Admin bypasses permission check
+	role, _ := c.Get("user_role")
+	if role == "admin" {
+		return true
+	}
+
+	canEdit, err := h.assignmentRepo.CanEdit(ctx, userID, projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to check permissions", c.Request.URL.Path))
+		return false
+	}
+	if !canEdit {
+		c.JSON(http.StatusForbidden, errorResponse("forbidden", "Forbidden", 403, "EDIT permission required", c.Request.URL.Path))
+		return false
+	}
+	return true
 }
 
 // ListProjects GET /api/v1/projects
@@ -499,7 +523,7 @@ func (h *WellHandler) CreateWell(c *gin.Context) {
 		return
 	}
 
-	// Verify project ownership first
+	// Verify project access first
 	_, err = h.projectRepo.GetByIDForUser(c.Request.Context(), projectID, userID.(uuid.UUID))
 	if err != nil {
 		if err == repository.ErrProjectNotFound {
@@ -507,6 +531,11 @@ func (h *WellHandler) CreateWell(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to verify project", c.Request.URL.Path))
 		}
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if !h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), projectID, c) {
 		return
 	}
 
@@ -578,6 +607,22 @@ func (h *WellHandler) UpdateWell(c *gin.Context) {
 		return
 	}
 
+	// Get well to find project ID for permission check
+	well, err := h.wellRepo.GetByIDForUser(c.Request.Context(), wellID, userID.(uuid.UUID))
+	if err != nil {
+		if err == repository.ErrWellNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Well not found", c.Request.URL.Path))
+		} else {
+			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to get well", c.Request.URL.Path))
+		}
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if !h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), well.ProjectID, c) {
+		return
+	}
+
 	var req model.WellUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, validationErrorResponse("Invalid request body", ginErrors(err), c.Request.URL.Path))
@@ -622,7 +667,7 @@ func (h *WellHandler) UpdateWell(c *gin.Context) {
 		updates["description"] = *req.Description
 	}
 
-	well, err := h.wellRepo.Update(c.Request.Context(), wellID, userID.(uuid.UUID), updates)
+	well, err = h.wellRepo.Update(c.Request.Context(), wellID, userID.(uuid.UUID), updates)
 	if err != nil {
 		if err == repository.ErrWellNotFound {
 			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Well not found", c.Request.URL.Path))
@@ -648,6 +693,22 @@ func (h *WellHandler) DeleteWell(c *gin.Context) {
 	wellID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid well ID", c.Request.URL.Path))
+		return
+	}
+
+	// Get well to find project ID for permission check
+	well, err := h.wellRepo.GetByIDForUser(c.Request.Context(), wellID, userID.(uuid.UUID))
+	if err != nil {
+		if err == repository.ErrWellNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Well not found", c.Request.URL.Path))
+		} else {
+			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to get well", c.Request.URL.Path))
+		}
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if !h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), well.ProjectID, c) {
 		return
 	}
 

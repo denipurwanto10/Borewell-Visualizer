@@ -42,9 +42,9 @@ func New(db *database.DB, cfg *config.Config) *Handler {
 	assignmentRepo := repository.NewAssignmentRepo(db)
 
 	projectHandler := NewProjectHandler(projectRepo, wellRepo, assignmentRepo)
-	wellHandler := NewWellHandler(wellRepo, projectRepo)
-	moduleHandler := NewModuleHandler(moduleRepo)
-	docHandler := NewDocumentationHandler(docRepo, cfg.FileStoragePath)
+	wellHandler := NewWellHandler(wellRepo, projectRepo, assignmentRepo)
+	moduleHandler := NewModuleHandler(moduleRepo, projectRepo, assignmentRepo, wellRepo)
+	docHandler := NewDocumentationHandler(docRepo, projectRepo, assignmentRepo, wellRepo, cfg.FileStoragePath)
 	backupHandler := NewBackupHandler(db, projectRepo, wellRepo, moduleRepo, docRepo)
 	migrationHandler := NewMigrationHandler(db, projectRepo, wellRepo, moduleRepo, docRepo, cfg.FileStoragePath)
 

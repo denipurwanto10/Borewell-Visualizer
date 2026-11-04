@@ -151,8 +151,16 @@ func (r *AssignmentRepo) EffectivePermission(ctx context.Context, userID, projec
 		return "admin", nil
 	}
 
+	// Query project with access check (bypasses RLS for admin/owner/assignment)
+	// Returns owner_id only if user has access to the project
 	var ownerID uuid.UUID
-	err = r.db.Pool.QueryRow(ctx, `SELECT owner_id FROM projects WHERE id = $1`, projectID).Scan(&ownerID)
+	err = r.db.Pool.QueryRow(ctx, `
+		SELECT owner_id FROM projects
+		WHERE id = $1
+		AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin')
+		     OR owner_id = $2
+		     OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = projects.id AND pa.user_id = $2))
+	`, projectID, userID).Scan(&ownerID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrProjectNotFound
@@ -173,22 +181,76 @@ func (r *AssignmentRepo) EffectivePermission(ctx context.Context, userID, projec
 	return perm, nil
 }
 
-// CanAccess reports whether the user can access the project.
-func (r *AssignmentRepo) CanAccess(ctx context.Context, userID, projectID uuid.UUID) (bool, error) {
-	perm, err := r.EffectivePermission(ctx, userID, projectID)
-	if err != nil {
-		return false, err
-	}
-	return perm != "", nil
-}
-
 // CanEdit reports whether the user can modify data in the project.
 func (r *AssignmentRepo) CanEdit(ctx context.Context, userID, projectID uuid.UUID) (bool, error) {
-	perm, err := r.EffectivePermission(ctx, userID, projectID)
+	var result bool
+	err := r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
+		perm, err := r.effectivePermissionTx(ctx, tx, userID, projectID)
+		if err != nil {
+			return err
+		}
+		result = perm == "admin" || perm == "edit"
+		return nil
+	})
+	return result, err
+}
+
+// effectivePermissionTx is the transactional version of EffectivePermission.
+// It must be called within a WithUserTx transaction.
+func (r *AssignmentRepo) effectivePermissionTx(ctx context.Context, tx database.Tx, userID, projectID uuid.UUID) (string, error) {
+	var role string
+	err := tx.QueryRow(ctx, `SELECT role FROM users WHERE id = $1`, userID).Scan(&role)
 	if err != nil {
-		return false, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrUserNotFound
+		}
+		return "", err
 	}
-	return perm == "admin" || perm == "edit", nil
+	if role == "admin" {
+		return "admin", nil
+	}
+
+	// Query project with access check (RLS is active due to WithUserTx)
+	var ownerID uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT owner_id FROM projects
+		WHERE id = $1
+		AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin')
+		     OR owner_id = $2
+		     OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = projects.id AND pa.user_id = $2))
+	`, projectID, userID).Scan(&ownerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrProjectNotFound
+		}
+		return "", err
+	}
+	if ownerID == userID {
+		return "edit", nil
+	}
+
+	perm, err := r.getPermissionTx(ctx, tx, projectID, userID)
+	if err != nil {
+		if errors.Is(err, ErrAssignmentNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return perm, nil
+}
+
+func (r *AssignmentRepo) getPermissionTx(ctx context.Context, tx database.Tx, projectID, userID uuid.UUID) (string, error) {
+	var perm string
+	err := tx.QueryRow(ctx, `
+		SELECT permission FROM project_assignments WHERE project_id = $1 AND user_id = $2
+	`, projectID, userID).Scan(&perm)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrAssignmentNotFound
+		}
+		return "", err
+	}
+	return perm, nil
 }
 
 func isUniqueViolation(err error) bool {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -19,12 +20,21 @@ import (
 )
 
 type DocumentationHandler struct {
-	docRepo *repository.DocumentationRepo
-	fileRoot string
+	docRepo        *repository.DocumentationRepo
+	projectRepo    *repository.ProjectRepo
+	assignmentRepo *repository.AssignmentRepo
+	wellRepo       *repository.WellRepo
+	fileRoot       string
 }
 
-func NewDocumentationHandler(docRepo *repository.DocumentationRepo, fileRoot string) *DocumentationHandler {
-	return &DocumentationHandler{docRepo: docRepo, fileRoot: fileRoot}
+func NewDocumentationHandler(docRepo *repository.DocumentationRepo, projectRepo *repository.ProjectRepo, assignmentRepo *repository.AssignmentRepo, wellRepo *repository.WellRepo, fileRoot string) *DocumentationHandler {
+	return &DocumentationHandler{
+		docRepo:        docRepo,
+		projectRepo:    projectRepo,
+		assignmentRepo: assignmentRepo,
+		wellRepo:       wellRepo,
+		fileRoot:       fileRoot,
+	}
 }
 
 // contextIDs extracts project_id or well_id from c.Param("id") based on URL path.
@@ -39,6 +49,44 @@ func contextIDs(c *gin.Context) (*uuid.UUID, *uuid.UUID, error) {
 		return nil, &parsed, nil
 	}
 	return &parsed, nil, nil
+}
+
+// checkEditPermission verifies the user has EDIT permission on the project.
+// For well-scoped endpoints, it resolves the project from the well.
+// Returns true if allowed, false if forbidden (and writes 403 response).
+func (h *DocumentationHandler) checkEditPermission(ctx context.Context, userID uuid.UUID, projectID *uuid.UUID, wellID *uuid.UUID, c *gin.Context) (uuid.UUID, bool) {
+	// Resolve project ID if not provided (well-scoped endpoint)
+	var resolvedProjectID uuid.UUID
+	if projectID != nil {
+		resolvedProjectID = *projectID
+	} else if wellID != nil {
+		well, err := h.wellRepo.GetByIDForUser(ctx, *wellID, userID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Well not found", c.Request.URL.Path))
+			return uuid.Nil, false
+		}
+		resolvedProjectID = well.ProjectID
+	} else {
+		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Project or well ID required", c.Request.URL.Path))
+		return uuid.Nil, false
+	}
+
+	// Admin bypasses permission check
+	role, _ := c.Get("user_role")
+	if role == "admin" {
+		return resolvedProjectID, true
+	}
+
+	canEdit, err := h.assignmentRepo.CanEdit(ctx, userID, resolvedProjectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to check permissions", c.Request.URL.Path))
+		return uuid.Nil, false
+	}
+	if !canEdit {
+		c.JSON(http.StatusForbidden, errorResponse("forbidden", "Forbidden", 403, "EDIT permission required", c.Request.URL.Path))
+		return uuid.Nil, false
+	}
+	return resolvedProjectID, true
 }
 
 // ListPhotos GET /api/v1/wells/:id/photos or /api/v1/projects/:id/photos
@@ -112,6 +160,11 @@ func (h *DocumentationHandler) UploadPhoto(c *gin.Context) {
 
 	if wellID == nil && projectID == nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Project or well ID required", c.Request.URL.Path))
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), projectID, wellID, c); !ok {
 		return
 	}
 
@@ -287,13 +340,29 @@ func (h *DocumentationHandler) UpdatePhoto(c *gin.Context) {
 		return
 	}
 
+	// Get photo to find project ID for permission check
+	photo, err := h.docRepo.GetPhotoForUser(c.Request.Context(), photoID, userID.(uuid.UUID))
+	if err != nil {
+		if err == repository.ErrPhotoNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Photo not found", c.Request.URL.Path))
+		} else {
+			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to get photo", c.Request.URL.Path))
+		}
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), &photo.ProjectID, photo.WellID, c); !ok {
+		return
+	}
+
 	var req model.PhotoUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, validationErrorResponse("Invalid request body", ginErrors(err), c.Request.URL.Path))
 		return
 	}
 
-	photo, err := h.docRepo.UpdatePhoto(c.Request.Context(), photoID, userID.(uuid.UUID), req)
+	photo, err = h.docRepo.UpdatePhoto(c.Request.Context(), photoID, userID.(uuid.UUID), req)
 	if err != nil {
 		if err == repository.ErrPhotoNotFound {
 			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Photo not found", c.Request.URL.Path))
@@ -317,6 +386,22 @@ func (h *DocumentationHandler) DeletePhoto(c *gin.Context) {
 	photoID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid photo ID", c.Request.URL.Path))
+		return
+	}
+
+	// Get photo to find project ID for permission check
+	photo, err := h.docRepo.GetPhotoForUser(c.Request.Context(), photoID, userID.(uuid.UUID))
+	if err != nil {
+		if err == repository.ErrPhotoNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Photo not found", c.Request.URL.Path))
+		} else {
+			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to get photo", c.Request.URL.Path))
+		}
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), &photo.ProjectID, photo.WellID, c); !ok {
 		return
 	}
 
@@ -418,6 +503,11 @@ func (h *DocumentationHandler) UploadDocument(c *gin.Context) {
 
 	if wellID == nil && projectID == nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Project or well ID required", c.Request.URL.Path))
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), projectID, wellID, c); !ok {
 		return
 	}
 
@@ -593,13 +683,29 @@ func (h *DocumentationHandler) UpdateDocument(c *gin.Context) {
 		return
 	}
 
+	// Get document to find project ID for permission check
+	document, err := h.docRepo.GetDocumentForUser(c.Request.Context(), documentID, userID.(uuid.UUID))
+	if err != nil {
+		if err == repository.ErrDocumentNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Document not found", c.Request.URL.Path))
+		} else {
+			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to get document", c.Request.URL.Path))
+		}
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), &document.ProjectID, document.WellID, c); !ok {
+		return
+	}
+
 	var req model.DocumentUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, validationErrorResponse("Invalid request body", ginErrors(err), c.Request.URL.Path))
 		return
 	}
 
-	document, err := h.docRepo.UpdateDocument(c.Request.Context(), documentID, userID.(uuid.UUID), req)
+	document, err = h.docRepo.UpdateDocument(c.Request.Context(), documentID, userID.(uuid.UUID), req)
 	if err != nil {
 		if err == repository.ErrDocumentNotFound {
 			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Document not found", c.Request.URL.Path))
@@ -623,6 +729,22 @@ func (h *DocumentationHandler) DeleteDocument(c *gin.Context) {
 	documentID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid document ID", c.Request.URL.Path))
+		return
+	}
+
+	// Get document to find project ID for permission check
+	document, err := h.docRepo.GetDocumentForUser(c.Request.Context(), documentID, userID.(uuid.UUID))
+	if err != nil {
+		if err == repository.ErrDocumentNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Document not found", c.Request.URL.Path))
+		} else {
+			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to get document", c.Request.URL.Path))
+		}
+		return
+	}
+
+	// Check EDIT permission (Admin bypasses)
+	if _, ok := h.checkEditPermission(c.Request.Context(), userID.(uuid.UUID), &document.ProjectID, document.WellID, c); !ok {
 		return
 	}
 
