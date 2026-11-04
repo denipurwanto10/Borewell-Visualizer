@@ -1,10 +1,13 @@
 // Phase 5 — Hydrograph Canvas Component for Groundwater Monitoring.
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
+import { useCanvasGestures } from '../hooks/useCanvasGestures';
 import { computeHydrographScale, depthToPixel, timeToPixel, depthRulerTickStep, timeAxisTickStep } from '../monitoring/geometry';
 
 export function MonitoringHydrographCanvas({ measurements, wellDepth, referencePoint, selectedId, onSelect }) {
   const canvasRef = useRef(null);
-  const animationFrameRef = useRef(null);
+  const wrapRef = useRef(null);
+  const [transform, setTransform] = useState({ scale: 1, tx: 0, ty: 0 });
+  const scaleRef = useRef(null);
 
   const validMeasurements = useMemo(() => 
     (measurements || [])
@@ -13,21 +16,71 @@ export function MonitoringHydrographCanvas({ measurements, wellDepth, referenceP
       .sort((a, b) => a.measuredAt - b.measuredAt),
   [measurements]);
 
-  const scale = useMemo(() => {
+  // Compute scale based on container size
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return null;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const plotLeft = 60;
     const plotRight = rect.width - 20;
     const plotTop = 20;
     const plotBottom = rect.height - 40;
-    return computeHydrographScale(validMeasurements, wellDepth, { plotLeft, plotRight, plotTop, plotBottom, minDepth: 0 });
+    scaleRef.current = computeHydrographScale(validMeasurements, wellDepth, { plotLeft, plotRight, plotTop, plotBottom, minDepth: 0 });
   }, [validMeasurements, wellDepth]);
+
+  // Hit test for measurement selection
+  const hitTest = useCallback((canvasX, canvasY) => {
+    const scale = scaleRef.current;
+    if (!scale) return null;
+    
+    const { plotLeft, plotRight, plotTop, plotBottom, minTime, maxTime, minDepth, maxDepth } = scale;
+    
+    // Convert canvas coordinates to data coordinates
+    // Note: canvasX/Y are already in transformed space
+    const x = canvasX;
+    const y = canvasY;
+    
+    // Find nearest point
+    let nearest = null;
+    let minDist = Infinity;
+    for (const m of validMeasurements) {
+      const px = timeToPixel(m.measuredAt, { plotLeft, plotRight, minTime, maxTime });
+      const py = depthToPixel(m.waterLevelDepth, { plotTop, plotBottom, minDepth, maxDepth });
+      const dist = Math.hypot(px - x, py - y);
+      if (dist < minDist && dist < 20 / transform.scale) { // Adjust threshold for zoom
+        minDist = dist;
+        nearest = m;
+      }
+    }
+    return nearest ? nearest.id : null;
+  }, [validMeasurements, transform.scale]);
+
+  // Gesture system
+  const { transform: gestureTransform, api: gestureApi } = useCanvasGestures({
+    targetRef: wrapRef,
+    minScale: 0.5,
+    maxScale: 5,
+    hitTest,
+    preventPanOnObject: false,
+    onTap: ({ hit }) => {
+      if (hit && onSelect) onSelect(hit);
+      else if (onSelect) onSelect(null);
+    },
+    onDoubleTap: () => {
+      gestureApi.reset();
+    },
+    onPan: () => {
+      // Pan handled by transform
+    },
+  });
+
+  // Combine transforms (gesture takes precedence)
+  const currentTransform = gestureTransform;
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !scale) return;
+    if (!canvas || !scaleRef.current) return;
 
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
@@ -39,10 +92,15 @@ export function MonitoringHydrographCanvas({ measurements, wellDepth, referenceP
     canvas.style.height = `${rect.height}px`;
     ctx.scale(dpr, dpr);
 
-    const { plotLeft, plotRight, plotTop, plotBottom, minDepth, maxDepth, depthScale, minTime, maxTime, timeScale } = scale;
+    const { plotLeft, plotRight, plotTop, plotBottom, minDepth, maxDepth, depthScale, minTime, maxTime, timeScale } = scaleRef.current;
 
     // Clear
     ctx.clearRect(0, 0, rect.width, rect.height);
+
+    // Apply transform
+    ctx.save();
+    ctx.translate(currentTransform.tx, currentTransform.ty);
+    ctx.scale(currentTransform.scale, currentTransform.scale);
 
     // Background
     ctx.fillStyle = '#fafafa';
@@ -173,49 +231,20 @@ export function MonitoringHydrographCanvas({ measurements, wellDepth, referenceP
       }
     });
 
+    ctx.restore(); // Restore transform
+
     // Tooltip will be handled by parent via onSelect
-  }, [validMeasurements, wellDepth, scale, referencePoint, selectedId]);
-
-  const handleMouseMove = (e) => {
-    if (!scale || !onSelect) return;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const { plotLeft, plotRight, plotTop, plotBottom, minTime, maxTime, minDepth, maxDepth } = scale;
-
-    // Find nearest point
-    let nearest = null;
-    let minDist = Infinity;
-    for (const m of validMeasurements) {
-      const px = timeToPixel(m.measuredAt, { plotLeft, plotRight, minTime, maxTime });
-      const py = depthToPixel(m.waterLevelDepth, { plotTop, plotBottom, minDepth, maxDepth });
-      const dist = Math.hypot(px - x, py - y);
-      if (dist < minDist && dist < 20) {
-        minDist = dist;
-        nearest = m;
-      }
-    }
-
-    if (nearest) {
-      onSelect(nearest.id);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (onSelect) onSelect(null);
-  };
+  }, [validMeasurements, wellDepth, referencePoint, selectedId, currentTransform]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{ width: '100%', height: '100%', display: 'block' }}
-      role="img"
-      aria-label="Hidrograf muka air tanah"
-    />
+    <div className="hydrograph-wrap" ref={wrapRef} style={{ touchAction: 'manipulation', width: '100%', height: '100%', overflow: 'hidden' }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: '100%', display: 'block' }}
+        role="img"
+        aria-label="Hidrograf muka air tanah"
+      />
+    </div>
   );
 }
 

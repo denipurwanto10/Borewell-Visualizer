@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useRef, useState, useCallback, useMemo, useImperativeHandle } from 'react';
+import { useCanvasGestures } from '../hooks/useCanvasGestures';
 import {
   depthToPixel, computeDepthScale, rulerTickStep,
 } from '../designer/geometry';
@@ -22,9 +23,7 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
   const [dimensions, setDimensions] = useState({ width: BASE_WIDTH, height: BASE_HEIGHT });
   const [hoveredBox, setHoveredBox] = useState(null);
   const [tooltip, setTooltip] = useState(null);
-  const [transform, setTransform] = useState({ scale: 1, tx: 0, ty: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const lastPan = useRef({ x: 0, y: 0 });
+  const boxesRef = useRef([]);
 
   // Responsive canvas sizing
   useEffect(() => {
@@ -36,7 +35,6 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
         const newWidth = Math.max(280, Math.min(width, 700));
         const newHeight = (newWidth / BASE_WIDTH) * BASE_HEIGHT;
         setDimensions({ width: newWidth, height: newHeight });
-        setTransform({ scale: 1, tx: 0, ty: 0 });
       }
     });
     ro.observe(wrapper);
@@ -74,13 +72,38 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     ? depthToPixel((config.groundLevel || 0) + config.matLevel, { plotTop: plot.plotTop, plotBottom: plot.plotBottom, minDepth: 0, maxDepth })
     : null;
 
+  // Hit test function for gestures
+  const hitTest = useCallback((canvasX, canvasY) => {
+    return [...boxesRef.current].reverse().find(b =>
+      canvasX >= b.x && canvasX <= b.x + b.width && canvasY >= b.y && canvasY <= b.y + b.height
+    );
+  }, []);
+
+  // Gesture system
+  const { transform, api: gestureApi } = useCanvasGestures({
+    targetRef: wrapperRef,
+    minScale: 0.5,
+    maxScale: 3,
+    hitTest,
+    preventPanOnObject: true, // Don't pan when over a component
+    onTap: ({ hit }) => {
+      if (hit && onSelect) onSelect(hit.id);
+    },
+    onDoubleTap: ({ clientX, clientY, canvasX, canvasY }) => {
+      // Double-tap to zoom into point
+      gestureApi.zoomTo(1.5, clientX, clientY);
+    },
+    onPan: () => {
+      // Cursor handled by CSS
+    },
+  });
+
   // Render
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const { dpr } = window;
-    const devicePixelRatio = dpr || 1;
+    const devicePixelRatio = window.devicePixelRatio || 1;
     const { W, H, plotTop, plotBottom, wellAxisPx, pxPerMm } = plot;
 
     canvas.width = W * devicePixelRatio;
@@ -96,6 +119,7 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     const boxes = [];
 
     const render = (progress = 1) => {
+      boxes.length = 0;
       ctx.clearRect(0, 0, W, H);
 
       const bg = ctx.createLinearGradient(0, 0, W, H);
@@ -120,6 +144,7 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
         wellAxisPx, pxPerMm,
       });
       boxes.push(...compBoxes);
+      boxesRef.current = boxes;
 
       // Labels right side with overlap prevention
       const labelX = W - 170;
@@ -188,36 +213,22 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     }
     document.fonts?.ready.then(() => { if (!cancelled && done) render(1); });
 
-    const hitTest = (clientX, clientY) => {
+    // Hover handling (separate from gestures)
+    const handleMove = (e) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = W / rect.width;
       const scaleY = H / rect.height;
-      // Invert CSS transform
-      const x = ((clientX - rect.left) * scaleX - transform.tx) / transform.scale;
-      const y = ((clientY - rect.top) * scaleY - transform.ty) / transform.scale;
+      const x = ((e.clientX - rect.left) * scaleX - transform.tx) / transform.scale;
+      const y = ((e.clientY - rect.top) * scaleY - transform.ty) / transform.scale;
       const found = [...boxes].reverse().find(b =>
         x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height
       );
-      return found;
-    };
-
-    const handleMove = (e) => {
-      const found = hitTest(e.clientX, e.clientY);
       if (found) {
         setHoveredBox(found);
         setTooltip({ x: e.clientX, y: e.clientY });
-        if (onSelect) onSelect(found.id);
       } else {
         setHoveredBox(null);
         setTooltip(null);
-      }
-    };
-    const handleDown = (e) => {
-      const found = hitTest(e.clientX, e.clientY);
-      if (found) {
-        setHoveredBox(found);
-        setTooltip({ x: e.clientX, y: e.clientY });
-        if (onSelect) onSelect(found.id);
       }
     };
     const handleLeave = (e) => {
@@ -227,76 +238,23 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     };
 
     canvas.addEventListener('pointermove', handleMove);
-    canvas.addEventListener('pointerdown', handleDown);
     canvas.addEventListener('pointerleave', handleLeave);
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafId);
       canvas.removeEventListener('pointermove', handleMove);
-      canvas.removeEventListener('pointerdown', handleDown);
       canvas.removeEventListener('pointerleave', handleLeave);
     };
   }, [components, config, selectedId, onSelect, plot, scaleInfo, groundY, matY, showGrid, transform]);
 
-  // Pan via pointer drag on wrapper
-  const handleWrapperDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    setIsPanning(true);
-    lastPan.current = { x: e.clientX, y: e.clientY };
-  }, []);
-  const handleWrapperMove = useCallback((e) => {
-    if (!isPanning) return;
-    setTransform(prev => ({
-      scale: prev.scale,
-      tx: prev.tx + (e.clientX - lastPan.current.x),
-      ty: prev.ty + (e.clientY - lastPan.current.y),
-    }));
-    lastPan.current = { x: e.clientX, y: e.clientY };
-  }, [isPanning]);
-  const handleWrapperUp = useCallback(() => setIsPanning(false), []);
-
-  useEffect(() => {
-    window.addEventListener('pointerup', handleWrapperUp);
-    return () => window.removeEventListener('pointerup', handleWrapperUp);
-  }, [handleWrapperUp]);
-
-  // Wheel zoom
-  useEffect(() => {
-    const onWheel = (e) => {
-      if (!e.ctrlKey && !e.metaKey) return;
-      e.preventDefault();
-      const rect = canvasRef.current.getBoundingClientRect();
-      const mx = (e.clientX - rect.left);
-      const my = (e.clientY - rect.top);
-      const delta = -e.deltaY * 0.001;
-      const newScale = Math.min(3, Math.max(0.5, transform.scale + delta));
-      const zoomFactor = newScale / transform.scale;
-      setTransform(prev => ({
-        scale: newScale,
-        tx: prev.tx - mx * (zoomFactor - 1),
-        ty: prev.ty - my * (zoomFactor - 1),
-      }));
-    };
-    const el = wrapperRef.current;
-    el?.addEventListener('wheel', onWheel, { passive: false });
-    return () => el?.removeEventListener('wheel', onWheel);
-  }, [transform.scale]);
-
-  // Public API
+  // Public API (combine gesture API with existing API)
   const api = useMemo(() => ({
-    fitToScreen() {
-      setTransform({ scale: 1, tx: 0, ty: 0 });
-    },
-    zoomIn() {
-      setTransform(prev => ({ scale: Math.min(3, prev.scale + 0.2), tx: prev.tx, ty: prev.ty }));
-    },
-    zoomOut() {
-      setTransform(prev => ({ scale: Math.max(0.5, prev.scale - 0.2), tx: prev.tx, ty: prev.ty }));
-    },
-    resetView() {
-      setTransform({ scale: 1, tx: 0, ty: 0 });
-    },
+    ...gestureApi,
+    fitToScreen: gestureApi.reset,
+    zoomIn: gestureApi.zoomIn,
+    zoomOut: gestureApi.zoomOut,
+    resetView: gestureApi.reset,
     exportPNG() {
       const canvas = canvasRef.current;
       if (!canvas) return null;
@@ -310,34 +268,34 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     getImageData() {
       return canvasRef.current?.toDataURL('image/png') || null;
     },
-  }), []);
+  }), [gestureApi]);
 
   useImperativeHandle(ref, () => api);
 
   const canvasStyle = {
     transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`,
     transformOrigin: 'top left',
-    cursor: isPanning ? 'grabbing' : 'crosshair',
+    cursor: 'crosshair',
     willChange: 'transform',
   };
 
+  // Determine touch-action: manipulation for zoom/pan, none when panning
+  const touchAction = 'manipulation';
+
   return (
-    <div className="designer-canvas-wrap" ref={wrapperRef}
-         onPointerDown={handleWrapperDown}
-         onPointerMove={handleWrapperMove}
-         style={{ touchAction: isPanning ? 'none' : 'manipulation' }}>
+    <div className="designer-canvas-wrap" ref={wrapperRef} style={{ touchAction }}>
       <div className="designer-sheet" style={canvasStyle}>
         <canvas
           ref={canvasRef}
           aria-label="Kanvas desain konstruksi sumur"
         />
-        {hoveredBox && tooltip && (
+      </div>
+      {hoveredBox && tooltip && (
           <div className="designer-tooltip" style={{ left: `${tooltip.x + 10}px`, top: `${tooltip.y + 10}px` }}>
             <strong>{hoveredBox.name || COMPONENT_LABELS[hoveredBox.type] || 'Komponen'}</strong>
             <span>{hoveredBox.detail}</span>
           </div>
         )}
-      </div>
     </div>
   );
 });
