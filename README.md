@@ -82,13 +82,54 @@ Interactive web application for visualizing and documenting borehole constructio
 
 ## Architecture
 
-![Borewell Visualizer system architecture](docs/architecture.svg)
+```mermaid
+flowchart LR
+    subgraph Client["Client (Browser)"]
+        PAGES["Feature Pages"]
+        API["Axios Client"]
+        STORE[("LocalStorage<br/>IndexedDB")]
+    end
+
+    subgraph Server["Go + Gin Backend :8080"]
+        REST["REST API /api/v1<br/>JWT · CSRF · CORS"]
+        APP["Handlers · Services<br/>Repositories"]
+        FS["File Storage"]
+        CLI["Migrate · Bootstrap CLI"]
+    end
+
+    subgraph DB["PostgreSQL 15+"]
+        PG[("borewell DB")]
+        RLS{{"RLS"}}
+    end
+
+    subgraph Ext["External"]
+        DOCKER["Docker<br/>postgres:15"]
+    end
+
+    PAGES --> API
+    PAGES -.->|offline| STORE
+    API -->|REST + JWT| REST
+    REST --> APP
+    APP -->|files| FS
+    APP -->|SQL| PG
+    RLS -.->|policies| PG
+    CLI -->|DDL · seed| PG
+    DOCKER -.->|hosts| PG
+```
 
 The application runs in two modes:
 
-**Frontend-only (LocalStorage/IndexedDB)** — Fully offline after initial load. No backend required.
+**Frontend-only (LocalStorage/IndexedDB)** — Fully offline after initial load. No backend required. Feature pages read and write LocalStorage, and photos or documents above 2 MB go to IndexedDB.
 
 **Full-stack (Go + PostgreSQL)** — Multi-user with authentication, project/well isolation via RLS, file storage with SHA-256 deduplication, and REST API.
+
+**Communication:**
+
+- **REST** — `/api/v1` for auth, projects, wells, modules, documentation, backup, and admin. Access token travels in the `Authorization` header; the refresh token stays in an HttpOnly cookie.
+- **Middleware** — request ID, CORS allow-list, CSRF check on state-changing methods, JWT validation, and per-IP rate limiting run before any handler.
+- **Data access** — handlers delegate to services, services to repositories. Every query runs inside PostgreSQL with RLS policies scoped to the active user's project and well.
+- **File storage** — the documentation service writes to `FILE_STORAGE_PATH`, validates MIME type and size, and stores a SHA-256 checksum for deduplication.
+- **Operations** — `cmd/migrate` applies the 13 versioned migrations, `cmd/bootstrap-admin` seeds the first approved administrator, and Docker only hosts the local PostgreSQL container.
 
 ## Quick Start
 
