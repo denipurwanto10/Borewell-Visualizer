@@ -30,7 +30,7 @@ func (r *ModuleRepo) GetDesignerForUser(ctx context.Context, wellID, userID uuid
 			FROM designer_states d
 			JOIN wells w ON d.well_id = w.id
 			JOIN projects p ON w.project_id = p.id
-			WHERE d.well_id = $1 AND p.owner_id = $2
+			WHERE d.well_id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`
 		m = &model.DesignerState{}
 		err := tx.QueryRow(ctx, query, wellID, userID).Scan(
@@ -54,7 +54,7 @@ func (r *ModuleRepo) UpsertDesigner(ctx context.Context, wellID, userID uuid.UUI
 		var dummy uuid.UUID
 		err := tx.QueryRow(ctx, `
 			SELECT w.id FROM wells w JOIN projects p ON w.project_id = p.id
-			WHERE w.id = $1 AND p.owner_id = $2
+			WHERE w.id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`, wellID, userID).Scan(&dummy)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -102,7 +102,7 @@ func (r *ModuleRepo) getDesignerForUserTx(ctx context.Context, tx database.Tx, w
 		FROM designer_states d
 		JOIN wells w ON d.well_id = w.id
 		JOIN projects p ON w.project_id = p.id
-		WHERE d.well_id = $1 AND p.owner_id = $2
+		WHERE d.well_id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 	`
 	err := tx.QueryRow(ctx, query, wellID, userID).Scan(
 		&m.ID, &m.WellID, &m.Version, &m.Components, &m.Config, &m.CreatedAt, &m.UpdatedAt,
@@ -126,7 +126,7 @@ func (r *ModuleRepo) GetGeologyForUser(ctx context.Context, wellID, userID uuid.
 			FROM geological_logs g
 			JOIN wells w ON g.well_id = w.id
 			JOIN projects p ON w.project_id = p.id
-			WHERE g.well_id = $1 AND p.owner_id = $2
+			WHERE g.well_id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`
 		m = &model.GeologyLog{}
 		err := tx.QueryRow(ctx, query, wellID, userID).Scan(
@@ -149,7 +149,7 @@ func (r *ModuleRepo) UpsertGeology(ctx context.Context, wellID, userID uuid.UUID
 		var dummy uuid.UUID
 		err := tx.QueryRow(ctx, `
 			SELECT w.id FROM wells w JOIN projects p ON w.project_id = p.id
-			WHERE w.id = $1 AND p.owner_id = $2
+			WHERE w.id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`, wellID, userID).Scan(&dummy)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -197,7 +197,7 @@ func (r *ModuleRepo) getGeologyForUserTx(ctx context.Context, tx database.Tx, we
 		FROM geological_logs g
 		JOIN wells w ON g.well_id = w.id
 		JOIN projects p ON w.project_id = p.id
-		WHERE g.well_id = $1 AND p.owner_id = $2
+		WHERE g.well_id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 	`
 	err := tx.QueryRow(ctx, query, wellID, userID).Scan(
 		&m.ID, &m.WellID, &m.Version, &m.Layers, &m.CreatedAt, &m.UpdatedAt,
@@ -221,7 +221,7 @@ func (r *ModuleRepo) GetMonitoringForUser(ctx context.Context, wellID, userID uu
 			FROM groundwater_monitoring m
 			JOIN wells w ON m.well_id = w.id
 			JOIN projects p ON w.project_id = p.id
-			WHERE m.well_id = $1 AND p.owner_id = $2
+			WHERE m.well_id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`
 		m = &model.MonitoringData{}
 		err := tx.QueryRow(ctx, query, wellID, userID).Scan(
@@ -244,7 +244,7 @@ func (r *ModuleRepo) UpsertMonitoring(ctx context.Context, wellID, userID uuid.U
 		var dummy uuid.UUID
 		err := tx.QueryRow(ctx, `
 			SELECT w.id FROM wells w JOIN projects p ON w.project_id = p.id
-			WHERE w.id = $1 AND p.owner_id = $2
+			WHERE w.id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`, wellID, userID).Scan(&dummy)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -292,7 +292,7 @@ func (r *ModuleRepo) getMonitoringForUserTx(ctx context.Context, tx database.Tx,
 		FROM groundwater_monitoring m
 		JOIN wells w ON m.well_id = w.id
 		JOIN projects p ON w.project_id = p.id
-		WHERE m.well_id = $1 AND p.owner_id = $2
+		WHERE m.well_id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 	`
 	err := tx.QueryRow(ctx, query, wellID, userID).Scan(
 		&m.ID, &m.WellID, &m.Version, &m.Measurements, &m.CreatedAt, &m.UpdatedAt,

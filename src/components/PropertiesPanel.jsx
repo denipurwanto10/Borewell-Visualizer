@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Trash2, Copy, Eye, EyeOff, Save, AlertTriangle, Info } from 'lucide-react';
 import { Button, Field } from './Primitives';
 import { COMPONENT_LABELS, COMPONENT_DEFAULTS, INTERVAL_TYPES, MARKER_TYPES } from '../designer/model';
@@ -7,6 +7,12 @@ export default function PropertiesPanel({ component, onUpdate, onDuplicate, onDe
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(component ? { ...component } : null);
   const [unsaved, setUnsaved] = useState(false);
+
+  // Selalu selaraskan salinan lokal dengan komponen yang dipilih (sebelumnya null saat pertama kali memilih).
+  useEffect(() => {
+    setLocal(component ? { ...component } : null);
+    setUnsaved(false);
+  }, [component]);
 
   if (!component) {
     return (
@@ -64,56 +70,53 @@ export default function PropertiesPanel({ component, onUpdate, onDuplicate, onDe
         {isInterval ? (
           <>
             <Field label="Kedalaman mulai" unit="m" type="number" inputMode="decimal" step="0.1"
-              value={local.startDepth !== undefined ? local.startDepth : component.startDepth}
+              value={(local || {}).startDepth !== undefined ? (local || {}).startDepth : component.startDepth}
               onChange={(e) => handleChange('startDepth', e.target.value)} />
             <Field label="Kedalaman akhir" unit="m" type="number" inputMode="decimal" step="0.1"
-              value={local.endDepth !== undefined ? local.endDepth : component.endDepth}
+              value={(local || {}).endDepth !== undefined ? (local || {}).endDepth : component.endDepth}
               onChange={(e) => handleChange('endDepth', e.target.value)} />
             <Field label="Panjang" unit="m" type="number" inputMode="decimal" step="0.1"
-              value={local.length !== undefined ? local.length : component.length}
+              value={(local || {}).length !== undefined ? (local || {}).length : component.length}
               onChange={(e) => handleChange('length', e.target.value)}
               hint="Dihitung dari kedalaman akhir − mulai" />
           </>
         ) : (
           <Field label="Kedalaman" unit="m" type="number" inputMode="decimal" step="0.1"
-            value={local.startDepth !== undefined ? local.startDepth : component.startDepth}
+            value={(local || {}).startDepth !== undefined ? (local || {}).startDepth : component.startDepth}
             onChange={(e) => handleChange('startDepth', e.target.value)}
             hint="Kedalaman penanda komponen" />
         )}
 
         <Field label="Diameter luar" unit="mm" type="number" inputMode="decimal" step="1"
-          value={local.outerDiameter !== undefined ? local.outerDiameter : component.outerDiameter}
+          value={(local || {}).outerDiameter !== undefined ? (local || {}).outerDiameter : component.outerDiameter}
           onChange={(e) => handleChange('outerDiameter', e.target.value)} />
         {component.innerDiameter !== null && component.innerDiameter !== undefined ? (
           <Field label="Diameter dalam" unit="mm" type="number" inputMode="decimal" step="1"
-            value={local.innerDiameter !== undefined ? local.innerDiameter : component.innerDiameter}
+            value={(local || {}).innerDiameter !== undefined ? (local || {}).innerDiameter : component.innerDiameter}
             onChange={(e) => handleChange('innerDiameter', e.target.value)}
             hint="Kosongkan jika tidak berlaku" />
         ) : null}
-        <Field label="Materi" value={local.material !== undefined ? local.material : component.material}
+        <Field label="Materi" value={(local || {}).material !== undefined ? (local || {}).material : component.material}
           onChange={(e) => handleChange('material', e.target.value)} />
-        <Field label="Warna" value={local.color !== undefined ? local.color : component.color}
+        <Field label="Warna" value={(local || {}).color !== undefined ? (local || {}).color : component.color}
           onChange={(e) => handleChange('color', e.target.value)} />
-        <Field label="Deskripsi" as="textarea" rows={2}
-          value={local.description !== undefined ? local.description : component.description}
+        <Field label="Deskripsi" as="textarea" rows={2} className="col-2"
+          value={(local || {}).description !== undefined ? (local || {}).description : component.description}
           onChange={(e) => handleChange('description', e.target.value)} />
-        <Field label="Z-order" type="number" inputMode="decimal" step="1"
-          value={local.zOrder !== undefined ? local.zOrder : component.zOrder}
+        <Field label="Z-order" className="col-2" type="number" inputMode="decimal" step="1"
+          value={(local || {}).zOrder !== undefined ? (local || {}).zOrder : component.zOrder}
           onChange={(e) => handleChange('zOrder', e.target.value)}
           hint="Prioritas rendering (rendah = dibelakang)" />
       </div>
 
       <div className="property-actions">
-        <label className="field">
-          <span className="field-label">Tampilkan</span>
-          <span className="field-control">
-            <input
-              type="checkbox"
-              className="field-input"
-              checked={local.visible !== undefined ? local.visible : component.visible}
-              onChange={(e) => { setLocal(prev => ({ ...prev, visible: e.target.checked })); setUnsaved(true); }}
-            />
-          </span>
+        <label className="prop-toggle">
+          <span>Tampilkan di kanvas</span>
+          <input
+            type="checkbox"
+            checked={(local || {}).visible !== undefined ? (local || {}).visible : component.visible}
+            onChange={(e) => { setLocal(prev => ({ ...prev, visible: e.target.checked })); setUnsaved(true); }}
+          />
         </label>
         {unsaved && (
           <Button variant="soft" icon={Save} onClick={handleSave} className="w-full">

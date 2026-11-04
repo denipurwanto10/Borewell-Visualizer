@@ -41,6 +41,22 @@ export default defineConfig({
         headers: {
           Origin: 'http://127.0.0.1:8080',
         },
+        cookieDomainRewrite: {
+          'localhost': 'localhost',
+          '127.0.0.1': 'localhost',
+        },
+        configure: (proxy, _options) => {
+          proxy.on('proxyRes', (proxyRes, _req, _res) => {
+            // Forward Set-Cookie headers from backend to frontend
+            const setCookie = proxyRes.headers['set-cookie'];
+            if (setCookie) {
+              console.log('[Vite Proxy] Forwarding Set-Cookie:', setCookie);
+            }
+          });
+          proxy.on('error', (err, _req, _res) => {
+            console.error('[Vite Proxy] Error:', err);
+          });
+        },
       },
     },
   }

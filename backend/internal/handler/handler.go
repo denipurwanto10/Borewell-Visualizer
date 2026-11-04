@@ -33,14 +33,15 @@ func New(db *database.DB, cfg *config.Config) *Handler {
 	userRepo := repository.NewUserRepo(db)
 	sessionStore := auth.NewSessionStore(db)
 	authHandler := authhandler.NewHandler(userRepo, sessionStore, cfg)
-	adminHandler := admin.NewHandler(userRepo, sessionStore)
+	adminHandler := admin.NewHandler(userRepo, sessionStore, cfg)
 
 	projectRepo := repository.NewProjectRepo(db)
 	wellRepo := repository.NewWellRepo(db)
 	moduleRepo := repository.NewModuleRepo(db)
 	docRepo := repository.NewDocumentationRepo(db)
+	assignmentRepo := repository.NewAssignmentRepo(db)
 
-	projectHandler := NewProjectHandler(projectRepo, wellRepo)
+	projectHandler := NewProjectHandler(projectRepo, wellRepo, assignmentRepo)
 	wellHandler := NewWellHandler(wellRepo, projectRepo)
 	moduleHandler := NewModuleHandler(moduleRepo)
 	docHandler := NewDocumentationHandler(docRepo, cfg.FileStoragePath)

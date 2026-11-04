@@ -9,18 +9,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/borewell/visualizer/backend/internal/auth"
+	"github.com/borewell/visualizer/backend/internal/config"
 	"github.com/borewell/visualizer/backend/internal/repository"
 )
 
 type Handler struct {
 	userRepo     *repository.UserRepo
 	sessionStore *auth.SessionStore
+	cfg          *config.Config
 }
 
-func NewHandler(userRepo *repository.UserRepo, sessionStore *auth.SessionStore) *Handler {
+func NewHandler(userRepo *repository.UserRepo, sessionStore *auth.SessionStore, cfg *config.Config) *Handler {
 	return &Handler{
 		userRepo:     userRepo,
 		sessionStore: sessionStore,
+		cfg:          cfg,
 	}
 }
 
@@ -334,7 +337,7 @@ func (h *Handler) Reject(c *gin.Context) {
 	}
 
 	reason := req.Reason
-	if err := h.userRepo.UpdateStatus(c.Request.Context(), userID, "rejected", nil, &reason); err != nil {
+	if err := h.userRepo.UpdateStatusAndRevokeSessions(c.Request.Context(), userID, "rejected", nil, &reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"type":   "https://example.com/errors/internal-error",
 			"title":  "Internal Server Error",
@@ -343,8 +346,6 @@ func (h *Handler) Reject(c *gin.Context) {
 		})
 		return
 	}
-
-	h.sessionStore.RevokeAllUserSessions(c.Request.Context(), userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": RejectResponse{
@@ -452,7 +453,7 @@ func (h *Handler) Suspend(c *gin.Context) {
 		return
 	}
 
-	if err := h.userRepo.UpdateStatus(c.Request.Context(), userID, "suspended", nil, &req.Reason); err != nil {
+	if err := h.userRepo.UpdateStatusAndRevokeSessions(c.Request.Context(), userID, "suspended", nil, &req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"type":   "https://example.com/errors/internal-error",
 			"title":  "Internal Server Error",
@@ -461,8 +462,6 @@ func (h *Handler) Suspend(c *gin.Context) {
 		})
 		return
 	}
-
-	h.sessionStore.RevokeAllUserSessions(c.Request.Context(), userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": SuspendResponse{
@@ -543,6 +542,137 @@ func (h *Handler) Unsuspend(c *gin.Context) {
 			Status: "approved",
 		},
 	})
+}
+
+type CreateUserRequest struct {
+	Email     string `json:"email" binding:"required"`
+	Password  string `json:"password" binding:"required"`
+	FullName  string `json:"full_name" binding:"required,min=1,max=100"`
+	Role      string `json:"role"`
+}
+
+type CreateUserResponse struct {
+	ID       uuid.UUID `json:"id"`
+	Email    string    `json:"email"`
+	FullName string    `json:"full_name"`
+	Role     string    `json:"role"`
+	Status   string    `json:"status"`
+}
+
+func (h *Handler) CreateUser(c *gin.Context) {
+	var req CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
+			"type":   "https://example.com/errors/validation-failed",
+			"title":  "Validation Failed",
+			"status": 422,
+			"detail": "Invalid request body",
+		})
+		return
+	}
+
+	if err := auth.ValidatePassword(req.Password); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
+			"type":   "https://example.com/errors/validation-failed",
+			"title":  "Validation Failed",
+			"status": 422,
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	role := req.Role
+	if role == "" {
+		role = "user"
+	}
+	if role != "user" && role != "admin" {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
+			"type":   "https://example.com/errors/validation-failed",
+			"title":  "Validation Failed",
+			"status": 422,
+			"detail": "Invalid role",
+		})
+		return
+	}
+
+	params := auth.DefaultParams()
+	if h.cfg != nil {
+		if h.cfg.Argon2Time > 0 {
+			params.Time = h.cfg.Argon2Time
+		}
+		if h.cfg.Argon2Memory > 0 {
+			params.Memory = h.cfg.Argon2Memory
+		}
+		if h.cfg.Argon2Threads > 0 {
+			params.Threads = h.cfg.Argon2Threads
+		}
+		if h.cfg.Argon2KeyLen > 0 {
+			params.KeyLen = h.cfg.Argon2KeyLen
+		}
+	}
+
+	passwordHash, err := auth.HashPassword(req.Password, params)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"type":   "https://example.com/errors/internal-error",
+			"title":  "Internal Server Error",
+			"status": 500,
+			"detail": "Failed to process password",
+		})
+		return
+	}
+
+	adminID, _ := c.Get("user_id")
+	var approvedBy *uuid.UUID
+	if id, ok := adminID.(uuid.UUID); ok {
+		approvedBy = &id
+	}
+	now := time.Now().UTC()
+	user := &repository.User{
+		ID:           uuid.New(),
+		Email:        normalizeEmailAdmin(req.Email),
+		PasswordHash: passwordHash,
+		FullName:     req.FullName,
+		Role:         role,
+		Status:       "approved",
+		ApprovedAt:   &now,
+		ApprovedBy:   approvedBy,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := h.userRepo.Create(c.Request.Context(), user); err != nil {
+		if err == repository.ErrEmailExists {
+			c.JSON(http.StatusConflict, gin.H{
+				"type":   "https://example.com/errors/conflict",
+				"title":  "Conflict",
+				"status": 409,
+				"detail": "Email already exists",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"type":   "https://example.com/errors/internal-error",
+			"title":  "Internal Server Error",
+			"status": 500,
+			"detail": "Failed to create user",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"data": CreateUserResponse{
+			ID:       user.ID,
+			Email:    user.Email,
+			FullName: user.FullName,
+			Role:     user.Role,
+			Status:   user.Status,
+		},
+	})
+}
+
+func normalizeEmailAdmin(email string) string {
+	return email
 }
 
 func (h *Handler) countAdmins(ctx context.Context) (int, error) {

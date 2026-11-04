@@ -1,4 +1,5 @@
 import { useAuth } from '../../context/AuthContext';
+import { Ban } from 'lucide-react';
 import { Button } from '../Primitives';
 
 export default function SuspendedAccountPage() {
@@ -16,6 +17,7 @@ export default function SuspendedAccountPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
+          <span className="auth-badge is-bad" aria-hidden="true"><Ban size={26} strokeWidth={1.8} /></span>
           <h1>Akun Ditangguhkan</h1>
           <p>Akun Anda telah ditangguhkan oleh Admin.</p>
         </div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, useContext, isValidElement } from 'react';
-import { MoreHorizontal, Check, ChevronDown, CircleCheck, CircleX, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, CircleX, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react';
 
 /* ---------- Button ---------- */
 export function Button({ children, variant = 'primary', size, icon: Icon, loading = false, disabled = false, className = '', ...props }) {
@@ -21,19 +21,136 @@ export function Button({ children, variant = 'primary', size, icon: Icon, loadin
 
 /* ---------- Field ---------- */
 export function Field({ label, unit, hint, error, className = '', as: Element = 'input', children, ...props }) {
+  const isDate = Element === 'input' && props.type === 'date';
   return (
     <label className={`field ${error ? 'has-error' : ''} ${className}`}>
       {label && <span className="field-label">{label}</span>}
       <span className="field-control">
-        {Element === 'select' || Element === 'textarea'
-          ? <Element className="field-input" {...props}>{children}</Element>
-          : <Element className="field-input" {...props} />}
-        {Element !== 'select' && Element !== 'textarea' && children && <span className="field-icon">{children}</span>}
+        {isDate
+          ? <DateField {...props} />
+          : Element === 'select' || Element === 'textarea'
+            ? <Element className="field-input" {...props}>{children}</Element>
+            : <Element className="field-input" {...props} />}
+        {!isDate && Element !== 'select' && Element !== 'textarea' && children && <span className="field-icon">{children}</span>}
         {unit && <span className="field-unit">{unit}</span>}
       </span>
       {hint && !error && <span className="field-hint">{hint}</span>}
       {error && <span className="field-error" role="alert">{error}</span>}
     </label>
+  );
+}
+
+/* ---------- Kalender kustom: popover di desktop, bottom sheet di layar kecil ---------- */
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const HARI = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+const pad = (n) => String(n).padStart(2, '0');
+const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseISO = (v) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+};
+
+function DateField({ value, onChange, name, disabled, required, className, placeholder, ...rest }) {
+  const [sheet, setSheet] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const on = () => setSheet(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const [open, setOpen] = useState(false);
+  const selected = parseISO(value);
+  const [view, setView] = useState(() => selected || new Date());
+  const rootRef = useRef(null);
+  const btnRef = useRef(null);
+  const popRef = useRef(null);
+
+  const place = useCallback(() => {
+    const btn = btnRef.current; const root = rootRef.current;
+    if (!btn || !root) return;
+    if (sheet) { root.dataset.flip = 'sheet'; return; }
+    const r = btn.getBoundingClientRect();
+    const W = 316;
+    const left = Math.min(Math.max(12, r.left), window.innerWidth - W - 12);
+    const below = window.innerHeight - r.bottom;
+    root.style.setProperty('--dx', `${left}px`);
+    if (below < 440 && r.top > below) {
+      root.style.setProperty('--dy', 'auto'); root.style.setProperty('--db', `${window.innerHeight - r.top + 8}px`); root.dataset.flip = 'up';
+    } else {
+      root.style.setProperty('--dy', `${r.bottom + 8}px`); root.style.setProperty('--db', 'auto'); root.dataset.flip = 'down';
+    }
+  }, [sheet]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    place();
+    const down = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); };
+    const key = (e) => { if (e.key === 'Escape') { setOpen(false); btnRef.current?.focus(); } };
+    const scroll = (e) => { if (!sheet && !popRef.current?.contains(e.target)) setOpen(false); };
+    const resize = () => { if (sheet) place(); else setOpen(false); };
+    document.addEventListener('pointerdown', down);
+    document.addEventListener('keydown', key);
+    window.addEventListener('resize', resize);
+    window.addEventListener('scroll', scroll, { passive: true, capture: true });
+    const prevOverflow = document.body.style.overflow;
+    if (sheet) document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('pointerdown', down);
+      document.removeEventListener('keydown', key);
+      window.removeEventListener('resize', resize);
+      window.removeEventListener('scroll', scroll, { capture: true });
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, place, sheet]);
+
+  const emit = (v) => onChange && onChange({ target: { value: v, name } });
+  const pick = (d) => { emit(toISO(d)); setOpen(false); btnRef.current?.focus(); };
+  const y = view.getFullYear(); const m = view.getMonth();
+  const first = new Date(y, m, 1);
+  const offset = (first.getDay() + 6) % 7; // Senin = 0
+  const cells = Array.from({ length: 42 }, (_, i) => new Date(y, m, 1 - offset + i));
+  const today = new Date();
+  const same = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const shift = (n) => setView(new Date(y, m + n, 1));
+  const label = selected ? `${pad(selected.getDate())} ${BULAN[selected.getMonth()].slice(0, 3)} ${selected.getFullYear()}` : null;
+
+  return (
+    <span className={`datefield ${open ? 'is-open' : ''} ${sheet ? 'is-sheet' : ''}`} ref={rootRef}>
+      <button
+        ref={btnRef} type="button" disabled={disabled}
+        className={`field-input date-trigger ${label ? '' : 'is-empty'}`}
+        aria-haspopup="dialog" aria-expanded={open}
+        onClick={(e) => { e.preventDefault(); if (!open && selected) setView(selected); setOpen((v) => !v); }}
+      >
+        <span>{label || placeholder || 'Pilih tanggal'}</span>
+        <CalendarDays size={17} strokeWidth={1.8} />
+      </button>
+      <div className="datepop-backdrop" onClick={(e) => { e.preventDefault(); setOpen(false); }} aria-hidden="true" />
+      <div className="datepop" ref={popRef} onClick={(e) => e.preventDefault()} role="dialog" aria-modal={sheet || undefined} aria-label="Pilih tanggal" aria-hidden={!open}>
+        <span className="datepop-grab" aria-hidden="true" />
+        <div className="datepop-head">
+          <strong>{BULAN[m]} {y}</strong>
+          <span>
+            <button type="button" className="icon-btn" aria-label="Bulan sebelumnya" onClick={() => shift(-1)}><ChevronLeft size={18} /></button>
+            <button type="button" className="icon-btn" aria-label="Bulan berikutnya" onClick={() => shift(1)}><ChevronRight size={18} /></button>
+          </span>
+        </div>
+        <div className="datepop-grid">
+          {HARI.map((h) => <i key={h} className="dow">{h}</i>)}
+          {cells.map((d) => (
+            <button
+              key={d.getTime()} type="button" tabIndex={open ? 0 : -1}
+              className={`day ${d.getMonth() !== m ? 'is-out' : ''} ${same(d, today) ? 'is-today' : ''} ${same(d, selected) ? 'is-selected' : ''}`}
+              onClick={() => pick(d)}
+            >{d.getDate()}</button>
+          ))}
+        </div>
+        <div className="datepop-foot">
+          {!required && <button type="button" onClick={() => { emit(''); setOpen(false); }}>Hapus</button>}
+          <button type="button" onClick={() => pick(new Date())}>Hari ini</button>
+        </div>
+      </div>
+    </span>
   );
 }
 
@@ -243,18 +360,11 @@ export function Stat({ label, value, unit, decimals = true, icon: Icon, color })
 }
 
 /* ---------- Page heading ---------- */
-// Kicker berfungsi sebagai penunjuk lokasi (breadcrumb) — nomor urut "01 ·" dan
-// nilai kosong ("undefined") dibuang agar tampil bersih.
-const cleanKicker = (k) => (typeof k === 'string'
-  ? k.replace(/^\s*\d+\s*·\s*/, '').replace(/:\s*(undefined|null)\s*$/i, '').trim()
-  : k);
-
 export function PageHead({ kicker, title, description, children }) {
-  const label = cleanKicker(kicker);
   return (
     <header className="page-head">
       <div className="page-head-text">
-        {label ? <span className="kicker">{label}</span> : null}
+        <span className="kicker">{kicker}</span>
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
@@ -346,55 +456,75 @@ export function SectionHeader({ title, children }) {
   );
 }
 
-
-/* ---------- RowMenu: menu aksi per baris ----------
-   Terbuka saat tombol ditekan, ditutup lewat klik di luar / Esc / gulir.
-   Posisi "fixed" supaya tidak terpotong oleh tabel yang bisa digulir, dan
-   otomatis membuka ke atas bila ruang di bawah tidak cukup. */
-export function RowMenu({ children, label = 'Opsi' }) {
+/* ---------- Action menu (dropdown "⋯") ---------- */
+export function ActionMenu({ children, label = 'Opsi', icon: Icon }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState(null);
-  const wrapRef = useRef(null);
+  const [sheet, setSheet] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches);
+  const ref = useRef(null);
   const btnRef = useRef(null);
 
-  const toggle = () => {
-    if (open) { setOpen(false); return; }
-    const r = btnRef.current.getBoundingClientRect();
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 820px)');
+    const on = () => setSheet(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+
+  // Posisi menu dihitung dari tombolnya (position: fixed) agar tidak terpotong
+  // oleh tabel yang bisa di-scroll. Menu membuka ke atas bila ruang bawah sempit.
+  const place = useCallback(() => {
+    const btn = btnRef.current;
+    const root = ref.current;
+    if (!btn || !root) return;
+    if (sheet) { root.dataset.flip = 'sheet'; return; }
+    const r = btn.getBoundingClientRect();
     const below = window.innerHeight - r.bottom;
-    const right = Math.max(8, window.innerWidth - r.right);
-    setPos(below < 260 && r.top > below
-      ? { bottom: window.innerHeight - r.top + 6, right }
-      : { top: r.bottom + 6, right });
-    setOpen(true);
-  };
+    root.style.setProperty('--mx', `${Math.max(12, window.innerWidth - r.right)}px`);
+    if (below < 280 && r.top > below) {
+      root.style.setProperty('--my', 'auto');
+      root.style.setProperty('--mb', `${window.innerHeight - r.top + 6}px`);
+      root.dataset.flip = 'up';
+    } else {
+      root.style.setProperty('--my', `${r.bottom + 6}px`);
+      root.style.setProperty('--mb', 'auto');
+      root.dataset.flip = 'down';
+    }
+  }, [sheet]);
 
   useEffect(() => {
     if (!open) return undefined;
+    place();
     const close = () => setOpen(false);
-    const onDown = (e) => { if (!wrapRef.current?.contains(e.target)) close(); };
-    const onKey = (e) => { if (e.key === 'Escape') { close(); btnRef.current?.focus(); } };
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    const isSheet = () => window.matchMedia('(max-width: 820px)').matches;
+    const closeIfFloating = () => { if (!isSheet()) close(); };
+    window.addEventListener('resize', closeIfFloating);
+    window.addEventListener('scroll', closeIfFloating, { passive: true, capture: true });
     return () => {
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('resize', closeIfFloating);
+      window.removeEventListener('scroll', closeIfFloating, { capture: true });
     };
-  }, [open]);
+  }, [open, place]);
 
   return (
-    <div className={`action-menu ${open ? 'is-open' : ''}`} ref={wrapRef}>
-      <button type="button" ref={btnRef} className="icon-btn" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
-        <MoreHorizontal size={18} />
+    <div className={`action-menu ${open ? 'is-open' : ''}`} ref={ref}>
+      <button
+        ref={btnRef}
+        type="button"
+        className="icon-btn"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {Icon ? <Icon size={18} /> : <span className="dots" aria-hidden="true"><i /><i /><i /></span>}
       </button>
-      {open && (
-        <div className="dropdown" role="menu" style={pos} onClick={() => setOpen(false)}>
-          {children}
-        </div>
-      )}
+      <div className="dropdown" role="menu" aria-hidden={!open} onClick={() => setOpen(false)}>{children}</div>
     </div>
   );
 }

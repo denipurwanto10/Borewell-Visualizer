@@ -1,4 +1,5 @@
 import { useAuth } from '../../context/AuthContext';
+import { CircleX } from 'lucide-react';
 import { Button } from '../Primitives';
 
 export default function RejectedAccountPage() {
@@ -16,6 +17,7 @@ export default function RejectedAccountPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
+          <span className="auth-badge is-bad" aria-hidden="true"><CircleX size={26} strokeWidth={1.8} /></span>
           <h1>Pendaftaran Ditolak</h1>
           <p>Pendaftaran akun Anda telah ditolak oleh Admin.</p>
         </div>

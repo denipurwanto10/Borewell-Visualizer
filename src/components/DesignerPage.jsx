@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RotateCcw, Undo, Redo, Save, Trash2, X } from 'lucide-react';
+import { RotateCcw, Undo, Redo, Save, Trash2, X, Settings } from 'lucide-react';
 import { Button, PageHead } from './Primitives';
 import { useProject } from '../context/ProjectContext';
 import { DesignerCanvas } from './DesignerCanvas';
@@ -27,12 +27,34 @@ export default function DesignerPage({ notify }) {
   const [history, setHistory] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [issues, setIssues] = useState([]);
+  const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
   const canvasRef = useRef(null);
 
   // Initialize history when designer loads
   useEffect(() => {
     setHistory(createHistory(designer));
   }, []);
+
+  // Handle body scroll lock for tablet props drawer
+  useEffect(() => {
+    if (propsDrawerOpen) {
+      document.body.classList.add('props-drawer-open');
+    } else {
+      document.body.classList.remove('props-drawer-open');
+    }
+    return () => document.body.classList.remove('props-drawer-open');
+  }, [propsDrawerOpen]);
+
+  // Handle Escape key to close props drawer
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && propsDrawerOpen) {
+        setPropsDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [propsDrawerOpen]);
 
   // Load designer state when active well changes
   useEffect(() => {
@@ -287,6 +309,48 @@ export default function DesignerPage({ notify }) {
           />
         </aside>
       </div>
+
+      {/* Tablet: Floating properties button (768-1024px) */}
+      {selectedId && (
+        <button
+          className="floating-props-btn"
+          onClick={() => setPropsDrawerOpen(true)}
+          aria-label="Buka panel properti"
+          title="Buka panel properti"
+        >
+          <Settings size={22} />
+        </button>
+      )}
+
+      {/* Tablet: Properties drawer (768-1024px) */}
+      <div className={`props-drawer-scrim ${propsDrawerOpen ? 'is-open' : ''}`} onClick={() => setPropsDrawerOpen(false)} aria-hidden="true" />
+      <aside className={`props-drawer ${propsDrawerOpen ? 'is-open' : ''}`} role="dialog" aria-modal="true" aria-label="Properti komponen">
+        <div className="props-drawer-header">
+          <h2>Properti Komponen</h2>
+          <button
+            type="button"
+            className="props-drawer-close"
+            onClick={() => setPropsDrawerOpen(false)}
+            aria-label="Tutup panel properti"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="props-drawer-body">
+          <PropertiesPanel
+            component={components.find(c => c.id === selectedId) || null}
+            onUpdate={updateComponent}
+            onDuplicate={duplicateComponent}
+            onDelete={deleteComponent}
+            onVisibilityToggle={toggleVisibility}
+          />
+        </div>
+        <div className="props-drawer-footer">
+          <Button variant="ghost" onClick={() => setPropsDrawerOpen(false)} className="w-full">
+            Tutup
+          </Button>
+        </div>
+      </aside>
 
       {/* Bottom: full-width action bar */}
       <div className="designer-actions">

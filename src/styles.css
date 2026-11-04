@@ -874,8 +874,19 @@ input[type='number']::-webkit-outer-spin-button, input[type='number']::-webkit-i
 .geology-summary .stat-value b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 500; letter-spacing: -.03em; }
 .geology-summary .stat-value i { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--mute); }
 
+/* Tablet: 2-column layout (left list + right canvas), center form via drawer */
+@media (min-width: 768px) and (max-width: 959px) {
+  .geology-grid {
+    grid-template-columns: 280px minmax(0, 1fr);
+    align-items: start;
+  }
+  .geology-col-left { grid-column: 1; min-width: 280px; }
+  .geology-col-right { grid-column: 2; min-width: 0; }
+  .geology-col-center { display: none; }
+}
+
 /* Mobile */
-@media (max-width: 960px) {
+@media (max-width: 767px) {
   .geology-grid { grid-template-columns: 1fr; }
   .geology-col { min-width: 0; }
 }
@@ -967,8 +978,20 @@ input[type='number']::-webkit-outer-spin-button, input[type='number']::-webkit-i
 
 .validation-list .validation-item strong { font-size: 12px; }
 
+/* Tablet: 2-column layout (left list + right canvas), center form via drawer */
+@media (min-width: 768px) and (max-width: 959px) {
+  .monitoring-grid {
+    grid-template-columns: 300px minmax(0, 1fr);
+    align-items: start;
+  }
+  .monitoring-col-left { grid-column: 1; min-width: 300px; }
+  .monitoring-col-right { grid-column: 2; min-width: 0; }
+  .monitoring-col-center { display: none; }
+  .monitoring-stats .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
 /* Mobile */
-@media (max-width: 960px) {
+@media (max-width: 767px) {
   .monitoring-grid { grid-template-columns: 1fr; }
   .monitoring-col { min-width: 0; }
   .monitoring-stats .stats-grid { grid-template-columns: 1fr; }

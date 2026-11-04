@@ -1,7 +1,7 @@
 // Phase 4 — Geological Log editor page.
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Copy, Save, Check, X, Search, Layers } from 'lucide-react';
-import { PageHead } from './Primitives';
+import { Plus, Edit2, Trash2, Copy, Save, Check, X, Search, Layers, Settings } from 'lucide-react';
+import { PageHead, Field, Button } from './Primitives';
 import { useProject } from '../context/ProjectContext';
 import {
   emptyGeology, createLayer, normalizeGeology, getMaterial, getMaterialsByCategory, GEOLOGY_CATEGORIES,
@@ -23,6 +23,7 @@ export default function GeologyPage() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [form, setForm] = useState(null);
+  const [formDrawerOpen, setFormDrawerOpen] = useState(false);
 
   // Load geology when active well changes
   useEffect(() => {
@@ -42,6 +43,27 @@ export default function GeologyPage() {
     setEditingId(null);
     setForm(null);
   }, [activeWellId, loadActiveWellData]);
+
+  // Handle body scroll lock for tablet form drawer
+  useEffect(() => {
+    if (formDrawerOpen) {
+      document.body.classList.add('props-drawer-open');
+    } else {
+      document.body.classList.remove('props-drawer-open');
+    }
+    return () => document.body.classList.remove('props-drawer-open');
+  }, [formDrawerOpen]);
+
+  // Handle Escape key to close form drawer
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && formDrawerOpen) {
+        setFormDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [formDrawerOpen]);
 
   // Derived: well depth for validation/scale
   const wellDepth = useMemo(() => {
@@ -444,23 +466,94 @@ export default function GeologyPage() {
             </div>
           </div>
         </aside>
+
       </div>
+
+      {/* Tablet: Floating form button (768-1024px) */}
+      {form && (
+        <button
+          className="floating-props-btn"
+          onClick={() => setFormDrawerOpen(true)}
+          aria-label="Buka formulir lapisan"
+          title="Buka formulir lapisan"
+        >
+          <Settings size={22} />
+        </button>
+      )}
+
+      {/* Tablet: Form drawer (768-1024px) */}
+      <div className={`props-drawer-scrim ${formDrawerOpen ? 'is-open' : ''}`} onClick={() => setFormDrawerOpen(false)} aria-hidden="true" />
+      <aside className={`props-drawer ${formDrawerOpen ? 'is-open' : ''}`} role="dialog" aria-modal="true" aria-label="Formulir lapisan geologi">
+        <div className="props-drawer-header">
+          <h2>{editingId === 'new' ? 'Lapisan Baru' : 'Edit Lapisan'}</h2>
+          <button
+            type="button"
+            className="props-drawer-close"
+            onClick={() => { setEditingId(null); setFormDrawerOpen(false); }}
+            aria-label="Tutup formulir"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="props-drawer-body">
+          <form onSubmit={handleFormSubmit} className="stack">
+            <div className="form-grid">
+              <Field label="Nama lapisan" {...boundInput('name')} />
+              <Field label="Material" as="select" {...boundInput('material')}>
+                {Object.entries(materialOptions).map(([cat, mats]) => (
+                  <optgroup key={cat} label={GEOLOGY_CATEGORIES[cat].label}>
+                    {mats.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </optgroup>
+                ))}
+              </Field>
+            </div>
+            <div className="form-grid">
+              <Field label="Mulai dari (m)" type="number" step="0.1" min="0" {...boundInput('startDepth')} unit="m" />
+              <Field label="Sampai (m)" type="number" step="0.1" min="0" {...boundInput('endDepth')} unit="m" />
+            </div>
+            <div className="field">
+              <span className="field-label">Ketebalan (m)</span>
+              <span className="field-control">
+                <span className="field-input" readOnly>{form ? (Number(form.endDepth) - Number(form.startDepth)).toFixed(2) : '—'}</span>
+                <span className="field-unit">m (otomatis)</span>
+              </span>
+            </div>
+            <Field label="Deskripsi" as="textarea" rows={2} {...boundInput('description')} />
+            <Field label="Formasi geologi" {...boundInput('formation')} />
+            <Field label="Catatan" as="textarea" rows={2} {...boundInput('notes')} />
+            <div className="form-grid">
+              <Field label="Warna" type="color" {...boundInput('color')} />
+              <Field label="Pola" as="select" {...boundInput('pattern')}>
+                <option value="clay">Clay (garis mendatar)</option>
+                <option value="silt">Silt (titik)</option>
+                <option value="fine-sand">Pasir halus (hias diagonal)</option>
+                <option value="gravel">Kerikil (lingkaran)</option>
+                <option value="sandstone">Batu pasir (bata)</option>
+                <option value="limestone">Batu kapur (bata)</option>
+                <option value="shale">Silex (bata)</option>
+                <option value="granite">Granit (bata)</option>
+                <option value="basalt">Basalt (bata)</option>
+                <option value="fill">Material pengisi (garis putus)</option>
+                <option value="unknown">Tidak diketahui</option>
+              </Field>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => { setEditingId(null); setFormDrawerOpen(false); }}>Batal</button>
+              <button type="submit" className="btn btn-primary">Simpan Lapisan</button>
+            </div>
+          </form>
+        </div>
+        <div className="props-drawer-footer">
+          <Button variant="ghost" onClick={() => { setEditingId(null); setFormDrawerOpen(false); }} className="w-full">
+            Tutup
+          </Button>
+        </div>
+      </aside>
+
     </div>
   );
 }
 
 function boundInput(key, value, onChange) {
   return { value, onChange };
-}
-
-function Field({ label, unit, as: Element = 'input', children, ...props }) {
-  return (
-    <label className="field">
-      {label && <span className="field-label">{label}</span>}
-      <span className="field-control">
-        <Element className="field-input" {...props} />
-        {unit && <span className="field-unit">{unit}</span>}
-      </span>
-    </label>
-  );
 }

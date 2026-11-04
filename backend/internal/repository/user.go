@@ -235,3 +235,39 @@ func (r *UserRepo) ExistsAdmin(ctx context.Context) (bool, error) {
 	err := r.db.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE role = 'admin' AND status = 'approved')`).Scan(&exists)
 	return exists, err
 }
+
+// UpdateStatusAndRevokeSessions updates user status and revokes all their refresh sessions
+// in a single transaction to prevent race conditions where a refresh could succeed
+// between the status update and session revocation.
+func (r *UserRepo) UpdateStatusAndRevokeSessions(ctx context.Context, id uuid.UUID, status string, approvedBy *uuid.UUID, rejectionReason *string) error {
+	tx, err := r.db.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Update user status
+	query := `
+		UPDATE users
+		SET status = $1, approved_at = CASE WHEN $1 = 'approved' THEN now() ELSE approved_at END,
+		    approved_by = CASE WHEN $1 = 'approved' THEN $2 ELSE approved_by END,
+		    rejection_reason = CASE WHEN $1 = 'rejected' THEN $3 ELSE rejection_reason END,
+		    updated_at = now()
+		WHERE id = $4
+	`
+	result, err := tx.Exec(ctx, query, status, approvedBy, rejectionReason, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+
+	// Revoke all refresh sessions for this user in the same transaction
+	_, err = tx.Exec(ctx, `UPDATE refresh_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, id)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}

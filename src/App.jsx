@@ -93,7 +93,9 @@ export default function App() {
   const [model, setModel] = useState(freshModel());
   const [well, setWell] = useState(freshWell());
   const [activity, setActivity] = useState(freshActivity());
-  const [page, setPage] = useState('login');
+  const [page, setPage] = useState(() => (
+    typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/register' ? 'register' : 'login'
+  ));
 
   const stateRef = useRef({ model, well, activity });
   stateRef.current = { model, well, activity };
@@ -203,6 +205,17 @@ export default function App() {
       setPage(displayPage);
     }
   }, [authLoading, displayPage, page]);
+
+  // Tautan Masuk/Daftar (AuthLink) memakai history API; sinkronkan `page` dengan URL.
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const path = window.location.pathname.replace(/\/+$/, '');
+      if (path === '/register') setPage('register');
+      else if (path === '/login' || path === '') setPage('login');
+    };
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
 
   if (authLoading) {
     return (

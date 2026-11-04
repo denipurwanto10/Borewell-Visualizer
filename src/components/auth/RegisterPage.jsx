@@ -1,7 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
+import { User, Mail, Lock, ShieldCheck, ArrowRight, TriangleAlert, CircleCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { Button, useConfirm } from '../Primitives';
-import { Eye, EyeOff } from 'lucide-react';
+import { Button } from '../Primitives';
+import AuthField from './AuthField';
+import AuthLink from './AuthLink';
 
 export default function RegisterPage() {
   const { register, isAuthenticated } = useAuth();
@@ -9,18 +11,13 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [confirm, confirmDialog] = useConfirm();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSubmitted(true);
 
     if (!name.trim()) {
       setError('Nama lengkap wajib diisi.');
@@ -68,6 +65,7 @@ export default function RegisterPage() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-header">
+            <span className="auth-badge is-ok" aria-hidden="true"><CircleCheck size={26} strokeWidth={1.8} /></span>
             <h1>Pendaftaran Berhasil</h1>
             <p>Akun Anda telah dibuat dan menunggu persetujuan Admin.</p>
           </div>
@@ -75,19 +73,21 @@ export default function RegisterPage() {
             <p>Status akun: <strong>Menunggu Persetujuan</strong></p>
             <p>Silakan tunggu Admin menyetujui pendaftaran Anda sebelum masuk.</p>
           </div>
-          <Button variant="primary" as="a" href="/login" className="auth-submit">
-            Kembali ke Masuk
-          </Button>
+          <AuthLink href="/login" className="btn btn-primary auth-submit">
+            <span className="btn-label">Kembali ke Masuk</span>
+          </AuthLink>
         </div>
       </div>
     );
   }
 
+  const mismatch = !!confirmPassword && password !== confirmPassword;
+
   return (
     <div className="auth-page">
-      {confirmDialog}
       <div className="auth-card">
         <div className="auth-header">
+          <span className="auth-eyebrow">Akun baru</span>
           <h1>Daftar</h1>
           <p>Buat akun baru untuk Borewell Engineering Visualizer.</p>
         </div>
@@ -95,114 +95,75 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} noValidate>
           {error && (
             <div className="auth-error" role="alert">
-              {error}
+              <TriangleAlert size={17} aria-hidden="true" />
+              <span>{error}</span>
             </div>
           )}
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="name">Nama Lengkap</label>
-            <input
-              id="name"
-              type="text"
-              placeholder="Contoh: Budi Santoso"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+          <AuthField
+            id="name"
+            label="Nama Lengkap"
+            icon={User}
+            placeholder="Contoh: Budi Santoso"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="name"
+            required
+            invalid={!!error && !name.trim()}
+          />
+
+          <AuthField
+            id="email"
+            label="Email"
+            icon={Mail}
+            type="email"
+            placeholder="nama@contoh.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            invalid={!!error && !email}
+          />
+
+          <div className="auth-row">
+            <AuthField
+              id="password"
+              label="Password"
+              icon={Lock}
+              type="password"
+              placeholder="Minimal 12 karakter"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               required
-              autoComplete="name"
-              className="form-input"
+              invalid={!!error && !password}
+              hint="Minimal 12 karakter."
             />
-            {submitted && !name.trim() && (
-              <span className="form-error" role="alert">
-                Nama lengkap wajib diisi.
-              </span>
-            )}
-          </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              placeholder="nama@contoh.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <AuthField
+              id="confirm_password"
+              label="Konfirmasi Password"
+              icon={ShieldCheck}
+              type="password"
+              placeholder="Ulangi password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
               required
-              autoComplete="email"
-              className="form-input"
+              error={mismatch ? 'Konfirmasi password tidak cocok.' : undefined}
             />
-            {submitted && !email && (
-              <span className="form-error" role="alert">
-                Email wajib diisi.
-              </span>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">Password</label>
-            <div className="input-with-toggle">
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                className="form-input"
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            <span className="form-hint">Minimal 12 karakter.</span>
-            {submitted && !password && (
-              <span className="form-error" role="alert">
-                Password wajib diisi.
-              </span>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="confirm_password">Konfirmasi Password</label>
-            <div className="input-with-toggle">
-              <input
-                id="confirm_password"
-                type={showConfirmPassword ? 'text' : 'password'}
-                placeholder="••••••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                className="form-input"
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                aria-label={showConfirmPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            {(submitted || confirmPassword) && password !== confirmPassword && (
-              <span className="form-error" role="alert">
-                Konfirmasi password tidak cocok.
-              </span>
-            )}
           </div>
 
           <Button type="submit" variant="primary" className="auth-submit" loading={loading} disabled={loading}>
-            Daftar
+            {loading ? 'Memproses…' : <>Daftar <ArrowRight size={17} aria-hidden="true" /></>}
           </Button>
         </form>
 
         <div className="auth-footer">
-          <p>Sudah punya akun? <a href="/login">Masuk</a></p>
+          <p>Sudah punya akun? <AuthLink href="/login">Masuk</AuthLink></p>
         </div>
       </div>
     </div>

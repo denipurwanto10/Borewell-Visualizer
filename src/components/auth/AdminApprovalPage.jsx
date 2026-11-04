@@ -150,15 +150,15 @@ export default function AdminApprovalPage() {
             ) : (
               filteredUsers.map((u) => (
                 <tr key={u.id}>
-                  <td>{u.full_name || '-'}</td>
-                  <td>{u.email}</td>
-                  <td>
+                  <td data-label="Nama" className="admin-cell-name">{u.full_name || '-'}</td>
+                  <td data-label="Email" className="admin-cell-email">{u.email}</td>
+                  <td data-label="Status">
                     <span className={`badge ${STATUS_COLORS[u.status] || ''}`}>
                       {STATUS_LABELS[u.status] || u.status}
                     </span>
                   </td>
-                  <td>{new Date(u.created_at).toLocaleDateString('id-ID')}</td>
-                  <td>
+                  <td data-label="Dibuat pada">{new Date(u.created_at).toLocaleDateString('id-ID')}</td>
+                  <td data-label="Aksi" className="admin-cell-actions">
                     <div className="action-buttons">
                       {u.status === 'pending' && (
                         <>

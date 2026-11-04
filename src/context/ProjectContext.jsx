@@ -371,14 +371,12 @@ export function ProjectProvider({ children }) {
   // --- Well CRUD ---
 
   const selectProject = useCallback((id) => {
-    setActiveProjectId(id);
     setActiveProjectIdState(id);
     setActiveWellIdState(null);
     notify('Proyek aktif diubah', 'info');
   }, [notify]);
 
   const selectWell = useCallback((wellId) => {
-    setActiveWellId(wellId);
     setActiveWellIdState(wellId);
     notify('Sumur aktif diubah', 'info');
   }, [notify]);

@@ -1,7 +1,7 @@
 // Phase 5 — Groundwater Monitoring page.
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Copy, Save, Check, X, Search, Download, Upload, FileText, Droplets, AlertTriangle, Info } from 'lucide-react';
-import { PageHead } from './Primitives';
+import { Plus, Edit2, Trash2, Copy, Save, Check, X, Search, Download, Upload, FileText, Droplets, AlertTriangle, Info, Settings } from 'lucide-react';
+import { PageHead, Field, Button } from './Primitives';
 import { useProject } from '../context/ProjectContext';
 import {
   emptyMonitoring, createMeasurement, normalizeMonitoring, getMethod, getReferencePoint, sortByTime,
@@ -26,6 +26,7 @@ export default function MonitoringPage() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [form, setForm] = useState(null);
+  const [formDrawerOpen, setFormDrawerOpen] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importPreview, setImportPreview] = useState(null);
@@ -49,6 +50,27 @@ export default function MonitoringPage() {
     setEditingId(null);
     setForm(null);
   }, [activeWellId, loadActiveWellData]);
+
+  // Handle body scroll lock for tablet form drawer
+  useEffect(() => {
+    if (formDrawerOpen) {
+      document.body.classList.add('props-drawer-open');
+    } else {
+      document.body.classList.remove('props-drawer-open');
+    }
+    return () => document.body.classList.remove('props-drawer-open');
+  }, [formDrawerOpen]);
+
+  // Handle Escape key to close form drawer
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && formDrawerOpen) {
+        setFormDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [formDrawerOpen]);
 
   // Derived: well depth for validation/scale
   const wellDepth = useMemo(() => {
@@ -542,7 +564,67 @@ export default function MonitoringPage() {
             )}
           </div>
         </aside>
+
       </div>
+
+      {/* Tablet: Floating form button (768-1024px) */}
+      {form && (
+        <button
+          className="floating-props-btn"
+          onClick={() => setFormDrawerOpen(true)}
+          aria-label="Buka formulir pengukuran"
+          title="Buka formulir pengukuran"
+        >
+          <Settings size={22} />
+        </button>
+      )}
+
+      {/* Tablet: Form drawer (768-1024px) */}
+      <div className={`props-drawer-scrim ${formDrawerOpen ? 'is-open' : ''}`} onClick={() => setFormDrawerOpen(false)} aria-hidden="true" />
+      <aside className={`props-drawer ${formDrawerOpen ? 'is-open' : ''}`} role="dialog" aria-modal="true" aria-label="Formulir pengukuran monitoring">
+        <div className="props-drawer-header">
+          <h2>{editingId === 'new' ? 'Pengukuran Baru' : 'Edit Pengukuran'}</h2>
+          <button
+            type="button"
+            className="props-drawer-close"
+            onClick={() => { setEditingId(null); setFormDrawerOpen(false); }}
+            aria-label="Tutup formulir"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="props-drawer-body">
+          <form onSubmit={handleFormSubmit} className="stack">
+            <div className="form-grid">
+              <Field label="Tanggal & Waktu" type="datetime-local" {...boundInput('measuredAt')} />
+              <Field label="Kedalaman Air (m)" type="number" step="0.01" min="0" {...boundInput('waterLevelDepth')} unit="m" />
+            </div>
+            <div className="form-grid">
+              <Field label="Titik Referensi" as="select" {...boundInput('referencePoint')}>
+                {Object.entries(refPointOptions).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
+              </Field>
+              <Field label="Elevasi Referensi (m, opsional)" type="number" step="0.01" {...boundInput('referenceElevation')} unit="mdpl" />
+            </div>
+            <Field label="Metode Pengukuran" as="select" {...boundInput('method')}>
+              {Object.entries(materialOptions).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
+            </Field>
+            <Field label="Status" as="select" {...boundInput('status')}>
+              <option value="valid">Valid</option>
+              <option value="invalid">Tidak Valid</option>
+            </Field>
+            <Field label="Catatan" as="textarea" rows={3} {...boundInput('notes')} />
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => { setEditingId(null); setFormDrawerOpen(false); }}>Batal</button>
+              <button type="submit" className="btn btn-primary">Simpan Pengukuran</button>
+            </div>
+          </form>
+        </div>
+        <div className="props-drawer-footer">
+          <Button variant="ghost" onClick={() => { setEditingId(null); setFormDrawerOpen(false); }} className="w-full">
+            Tutup
+          </Button>
+        </div>
+      </aside>
 
       {/* Import Modal */}
       {showImportModal && (
@@ -588,18 +670,6 @@ export default function MonitoringPage() {
 
 function boundInput(key, value, onChange) {
   return { value, onChange };
-}
-
-function Field({ label, unit, as: Element = 'input', children, ...props }) {
-  return (
-    <label className="field">
-      {label && <span className="field-label">{label}</span>}
-      <span className="field-control">
-        <Element className="field-input" {...props} />
-        {unit && <span className="field-unit">{unit}</span>}
-      </span>
-    </label>
-  );
 }
 
 function MonitoringHydrographTooltip({ measurement }) {

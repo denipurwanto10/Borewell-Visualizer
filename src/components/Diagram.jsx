@@ -3,10 +3,10 @@ import { formatNumber, totalPipeLength, pipeBottom, totalDepth } from '../model'
 
 // Base design dimensions (aspect ratio 360:750 = 12:25)
 const BASE_WIDTH = 360;
-const BASE_HEIGHT = 750;
+const BASE_HEIGHT = 660;
 const TOP = 86;
 const BOTTOM = 10;
-const WELL_X_RATIO = 200 / BASE_WIDTH; // Relative to width
+const WELL_X_RATIO = 0.5; // pipa tepat di tengah kanvas (skala di kiri, label di kanan)
 
 function roundRect(ctx, x, y, w, h, r) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -38,20 +38,21 @@ function haloText(ctx, value, x, y, color) {
 export const Diagram = forwardRef(function Diagram({ model }, ref) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
+  const sheetRef = useRef(null);
   const [hoveredComponent, setHoveredComponent] = useState(null);
   const [tooltip, setTooltip] = useState(null);
   const [dimensions, setDimensions] = useState({ width: BASE_WIDTH, height: BASE_HEIGHT });
 
   // Track container size for responsive canvas
   useEffect(() => {
-    const wrapper = wrapperRef.current;
+    const wrapper = sheetRef.current || wrapperRef.current;
     if (!wrapper) return;
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width } = entry.contentRect;
         // Maintain aspect ratio 360:750 = 12:25
-        const newWidth = Math.max(280, Math.min(width, 480));
+        const newWidth = Math.max(260, Math.min(width, 560));
         const newHeight = (newWidth / BASE_WIDTH) * BASE_HEIGHT;
         setDimensions({ width: newWidth, height: newHeight });
       }
@@ -60,7 +61,7 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
     resizeObserver.observe(wrapper);
     // Initial measure
     const { width } = wrapper.getBoundingClientRect();
-    const newWidth = Math.max(280, Math.min(width, 480));
+    const newWidth = Math.max(260, Math.min(width, 560));
     const newHeight = (newWidth / BASE_WIDTH) * BASE_HEIGHT;
     setDimensions({ width: newWidth, height: newHeight });
 
@@ -102,12 +103,12 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
       // Judul di dalam kanvas
-      text(ctx, 'SKEMA KONSTRUKSI SUMUR', WIDTH / 2, 34, { size: 12, weight: 700, align: 'center', color: '#1e293b' });
+      text(ctx, 'SKEMA KONSTRUKSI SUMUR', WIDTH / 2, 34, { size: 14, weight: 700, align: 'center', color: '#1e293b' });
       ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(40 * (WIDTH / BASE_WIDTH), 44);
-      ctx.lineTo((WIDTH - 40) * (WIDTH / BASE_WIDTH), 44);
+      ctx.lineTo(WIDTH - 40 * (WIDTH / BASE_WIDTH), 44);
       ctx.stroke();
 
       if (!model.pipes.length) {
@@ -115,11 +116,11 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
         ctx.setLineDash([6, 6]);
         ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 2;
-        roundRect(ctx, WELL_X - 34 * (WIDTH / BASE_WIDTH), 240 * (HEIGHT / BASE_HEIGHT), 68 * (WIDTH / BASE_WIDTH), 240 * (HEIGHT / BASE_HEIGHT), 34 * (WIDTH / BASE_WIDTH));
+        roundRect(ctx, WELL_X - 34 * (WIDTH / BASE_WIDTH), 190 * (HEIGHT / BASE_HEIGHT), 68 * (WIDTH / BASE_WIDTH), 230 * (HEIGHT / BASE_HEIGHT), 34 * (WIDTH / BASE_WIDTH));
         ctx.stroke();
         ctx.restore();
-        text(ctx, 'Belum ada pipa', WIDTH / 2, 350 * (HEIGHT / BASE_HEIGHT), { size: 13, weight: 600, align: 'center', color: '#64748b' });
-        text(ctx, 'Tambahkan pipa untuk memulai', WIDTH / 2, 372 * (HEIGHT / BASE_HEIGHT), { size: 11, weight: 400, align: 'center', color: '#94a3b8' });
+        text(ctx, 'Belum ada pipa', WIDTH / 2, 462 * (HEIGHT / BASE_HEIGHT), { size: 16, weight: 600, align: 'center', color: '#64748b' });
+        text(ctx, 'Tambahkan pipa untuk memulai', WIDTH / 2, 485 * (HEIGHT / BASE_HEIGHT), { size: 13.5, weight: 400, align: 'center', color: '#94a3b8' });
         ctx.restore();
         return;
       }
@@ -193,7 +194,7 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
         ctx.moveTo(rulerX, y);
         ctx.lineTo(rulerX + (major ? 16 : 10) * (WIDTH / BASE_WIDTH), y);
         ctx.stroke();
-        ctx.font = `${major ? 700 : 600} ${major ? 11 : 10}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.font = `${major ? 700 : 600} ${major ? 13 : 12}px Hanken Grotesk, system-ui, sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillStyle = major ? '#1e293b' : '#64748b';
         ctx.fillText(`${formatNumber(value)} m`, rulerX - 5 * (WIDTH / BASE_WIDTH), y + (major ? 4 : 3.5));
@@ -303,12 +304,12 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
         ctx.lineTo(labelX, centerY);
         ctx.stroke();
         ctx.fillStyle = '#000';
-        ctx.font = `bold ${11 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.font = `bold ${12.5 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
         ctx.textAlign = 'left';
         ctx.fillText(`Saringan (${formatNumber(screen.size)} m)`, labelX + 4 * (WIDTH / BASE_WIDTH), centerY);
         ctx.fillStyle = '#64748b';
-        ctx.font = `${10 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
-        ctx.fillText(`${formatNumber(screen.depth)} - ${formatNumber(screen.depth + screen.size)} m`, labelX + 4 * (WIDTH / BASE_WIDTH), centerY + 14 * (HEIGHT / BASE_HEIGHT));
+        ctx.font = `${11.5 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.fillText(`${formatNumber(screen.depth)} - ${formatNumber(screen.depth + screen.size)} m`, labelX + 4 * (WIDTH / BASE_WIDTH), centerY + 17 * (HEIGHT / BASE_HEIGHT));
 
         components.push({
           type: 'screen',
@@ -397,12 +398,12 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
         ctx.stroke();
 
         ctx.fillStyle = '#1e293b';
-        ctx.font = `bold ${11 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.font = `bold ${12.5 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
         ctx.textAlign = 'left';
         ctx.fillText(`Open Hole (${formatNumber(model.openHole.size)} m)`, labelX + 4 * (WIDTH / BASE_WIDTH), centerY);
         ctx.fillStyle = '#64748b';
-        ctx.font = `${10 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
-        ctx.fillText(`${formatNumber(model.openHole.start)} - ${formatNumber(model.openHole.end)} m`, labelX + 4 * (WIDTH / BASE_WIDTH), centerY + 14 * (HEIGHT / BASE_HEIGHT));
+        ctx.font = `${11.5 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.fillText(`${formatNumber(model.openHole.start)} - ${formatNumber(model.openHole.end)} m`, labelX + 4 * (WIDTH / BASE_WIDTH), centerY + 17 * (HEIGHT / BASE_HEIGHT));
 
         // Label Total Pipa di samping kanan bawah pipa terakhir
         const totalPipeLengthVal = totalPipeLength(model);
@@ -425,18 +426,18 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
           ctx.stroke();
 
           ctx.fillStyle = '#1e293b';
-          ctx.font = `bold ${11 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+          ctx.font = `bold ${12.5 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
           ctx.textAlign = 'left';
           ctx.fillText(`Total Pipa (${formatNumber(totalPipeLengthVal)} m)`, labelXTotal + 4 * (WIDTH / BASE_WIDTH), centerYTotal);
 
           ctx.fillStyle = '#64748b';
-          ctx.font = `${10 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
-          ctx.fillText(`${formatNumber(lastPipe.start)} - ${formatNumber(lastPipe.end)} m`, labelXTotal + 4 * (WIDTH / BASE_WIDTH), centerYTotal + 14 * (HEIGHT / BASE_HEIGHT));
+          ctx.font = `${11.5 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+          ctx.fillText(`${formatNumber(lastPipe.start)} - ${formatNumber(lastPipe.end)} m`, labelXTotal + 4 * (WIDTH / BASE_WIDTH), centerYTotal + 17 * (HEIGHT / BASE_HEIGHT));
         }
 
         // Label kedalaman total di ujung bawah canvas
         ctx.fillStyle = '#1e293b';
-        ctx.font = `bold ${11 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.font = `bold ${12.5 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
         ctx.textAlign = 'left';
         ctx.fillText(`Kedalaman total: ${formatNumber(totalPipeLengthVal)} m`, 14 * (WIDTH / BASE_WIDTH), HEIGHT - BOTTOM / 2 * (HEIGHT / BASE_HEIGHT) + 12 * (HEIGHT / BASE_HEIGHT));
 
@@ -474,9 +475,9 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
           ctx.closePath();
           ctx.fill();
         }
-        ctx.font = `700 ${11 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.font = `700 ${10 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
         ctx.textAlign = 'left';
-        haloText(ctx, 'Permukaan tanah', 20 * (WIDTH / BASE_WIDTH), y - 12 * (HEIGHT / BASE_HEIGHT), '#b45309');
+        haloText(ctx, 'Permukaan tanah', 12 * (WIDTH / BASE_WIDTH), y - 12 * (HEIGHT / BASE_HEIGHT), '#b45309');
       }
 
       // Muka air tanah
@@ -491,12 +492,12 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
           height: 10,
           detail: `${formatNumber(model.mat)} m dari muka tanah`,
         });
-        ctx.font = `700 ${11 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
+        ctx.font = `700 ${10 * (WIDTH / BASE_WIDTH)}px Hanken Grotesk, system-ui, sans-serif`;
         ctx.textAlign = 'left';
         haloText(ctx, model.mat >= 0
           ? `MAT: ${formatNumber(model.mat)} m dari`
-          : `MAT: ${formatNumber(Math.abs(model.mat))} m di atas`, 20 * (WIDTH / BASE_WIDTH), y + 17 * (HEIGHT / BASE_HEIGHT), '#1d4ed8');
-        haloText(ctx, 'muka tanah', 20 * (WIDTH / BASE_WIDTH), y + 31 * (HEIGHT / BASE_HEIGHT), '#1d4ed8');
+          : `MAT: ${formatNumber(Math.abs(model.mat))} m di atas`, 12 * (WIDTH / BASE_WIDTH), y + 17 * (HEIGHT / BASE_HEIGHT), '#1d4ed8');
+        haloText(ctx, 'muka tanah', 12 * (WIDTH / BASE_WIDTH), y + 31 * (HEIGHT / BASE_HEIGHT), '#1d4ed8');
         const triCX = WIDTH - 30 * (WIDTH / BASE_WIDTH);
         ctx.beginPath();
         ctx.moveTo(triCX - 7 * (WIDTH / BASE_WIDTH), y - 12 * (HEIGHT / BASE_HEIGHT));
@@ -584,7 +585,7 @@ export const Diagram = forwardRef(function Diagram({ model }, ref) {
   return (
     <div className="diagram-interactive" ref={wrapperRef}>
       <div className="diagram-canvas-wrap">
-        <div className="diagram-sheet">
+        <div className="diagram-sheet" ref={sheetRef}>
           <canvas
             ref={(node) => {
               canvasRef.current = node;

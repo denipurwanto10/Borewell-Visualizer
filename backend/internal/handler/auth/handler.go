@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -247,6 +248,7 @@ func (h *Handler) Login(c *gin.Context) {
 		})
 		return
 	case "approved":
+		// Allow login to proceed
 	default:
 		h.genericUnauthorized(c)
 		return
@@ -531,37 +533,40 @@ func normalizeEmail(email string) string {
 func setRefreshCookie(c *gin.Context, token string, expiry time.Duration, isProduction bool) {
 	secure := isProduction
 	sameSite := "Lax"
+	domain := ""
 	if isProduction {
 		sameSite = "None" // Required for cross-site cookies in production with Secure
+	} else {
+		domain = "localhost" // Development: share cookie across localhost ports
 	}
 
-	c.SetCookie(
-		"refresh_token",
-		token,
-		int(expiry.Seconds()),
-		"/",
-		"",
-		secure,
-		true,
-	)
-	c.Header("Set-Cookie", c.Writer.Header().Get("Set-Cookie")+"; SameSite="+sameSite)
+	// Build cookie manually to avoid duplicate SameSite (gin v1.10 doesn't support SameSite param)
+	cookie := fmt.Sprintf("refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; SameSite=%s", token, int(expiry.Seconds()), sameSite)
+	if domain != "" {
+		cookie += "; Domain=" + domain
+	}
+	if secure {
+		cookie += "; Secure"
+	}
+	c.Header("Set-Cookie", cookie)
 }
 
 func clearRefreshCookie(c *gin.Context, isProduction bool) {
 	secure := isProduction
 	sameSite := "Lax"
+	domain := ""
 	if isProduction {
 		sameSite = "None"
+	} else {
+		domain = "localhost" // Development: match cookie creation domain
 	}
 
-	c.SetCookie(
-		"refresh_token",
-		"",
-		-1,
-		"/",
-		"",
-		secure,
-		true,
-	)
-	c.Header("Set-Cookie", c.Writer.Header().Get("Set-Cookie")+"; SameSite="+sameSite)
+	cookie := fmt.Sprintf("refresh_token=; Path=/; Max-Age=-1; HttpOnly; SameSite=%s", sameSite)
+	if domain != "" {
+		cookie += "; Domain=" + domain
+	}
+	if secure {
+		cookie += "; Secure"
+	}
+	c.Header("Set-Cookie", cookie)
 }

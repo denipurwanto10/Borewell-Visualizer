@@ -124,7 +124,7 @@ func (r *DocumentationRepo) ListPhotos(ctx context.Context, userID uuid.UUID, pr
 		args := []any{userID}
 		argIndex := 2
 
-		where := "WHERE p.project_id IN (SELECT id FROM projects WHERE owner_id = $1)"
+		where := "WHERE p.project_id IN (SELECT id FROM projects WHERE (EXISTS (SELECT 1 FROM users u WHERE u.id = $1 AND u.role = 'admin') OR owner_id = $1 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = projects.id AND pa.user_id = $1)))"
 		if projectID != nil {
 			where += " AND p.project_id = $" + string(rune('0'+argIndex))
 			args = append(args, *projectID)
@@ -211,7 +211,7 @@ func (r *DocumentationRepo) GetPhotoForUser(ctx context.Context, photoID, userID
 				f.original_name, f.mime_type, f.size_bytes, f.storage_path, f.checksum_sha256
 			FROM documentation_photos p
 			JOIN files f ON p.file_id = f.id
-			WHERE p.id = $1 AND f.owner_id = $2
+			WHERE p.id = $1 AND (f.owner_id = $2 OR EXISTS (SELECT 1 FROM projects pr WHERE pr.id = p.project_id AND (pr.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = pr.id AND pa.user_id = $2) OR EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin'))))
 		`
 		p = &model.PhotoWithFile{}
 		var wellIDPtr *uuid.UUID
@@ -296,7 +296,7 @@ func (r *DocumentationRepo) UpdatePhoto(ctx context.Context, photoID, userID uui
 		err := tx.QueryRow(ctx, `
 			SELECT p.id FROM documentation_photos p
 			JOIN files f ON p.file_id = f.id
-			WHERE p.id = $1 AND f.owner_id = $2
+			WHERE p.id = $1 AND (f.owner_id = $2 OR EXISTS (SELECT 1 FROM projects pr WHERE pr.id = p.project_id AND (pr.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = pr.id AND pa.user_id = $2) OR EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin'))))
 		`, photoID, userID).Scan(&dummy)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -347,7 +347,7 @@ func (r *DocumentationRepo) UpdatePhoto(ctx context.Context, photoID, userID uui
 		args = append(args, photoID, userID)
 
 		query := `UPDATE documentation_photos SET ` + joinStrings(setParts, ", ") + `
-			WHERE id = $` + string(rune('0'+argIndex)) + ` AND file_id IN (SELECT id FROM files WHERE owner_id = $` + string(rune('0'+argIndex+1)) + `)
+			WHERE id = $` + string(rune('0'+argIndex)) + `
 			RETURNING id, project_id, well_id, file_id, name, category, description, documented_at, width, height, created_at, updated_at`
 		p := &model.PhotoWithFile{}
 		var wellIDPtr *uuid.UUID
@@ -372,7 +372,7 @@ func (r *DocumentationRepo) DeletePhoto(ctx context.Context, photoID, userID uui
 		err := tx.QueryRow(ctx, `
 			SELECT p.file_id FROM documentation_photos p
 			JOIN files f ON p.file_id = f.id
-			WHERE p.id = $1 AND f.owner_id = $2
+			WHERE p.id = $1 AND (f.owner_id = $2 OR EXISTS (SELECT 1 FROM projects pr WHERE pr.id = p.project_id AND (pr.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = pr.id AND pa.user_id = $2) OR EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin'))))
 		`, photoID, userID).Scan(&fileID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -428,7 +428,7 @@ func (r *DocumentationRepo) ListDocuments(ctx context.Context, userID uuid.UUID,
 		args := []any{userID}
 		argIndex := 2
 
-		where := "WHERE d.project_id IN (SELECT id FROM projects WHERE owner_id = $1)"
+		where := "WHERE d.project_id IN (SELECT id FROM projects WHERE (EXISTS (SELECT 1 FROM users u WHERE u.id = $1 AND u.role = 'admin') OR owner_id = $1 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = projects.id AND pa.user_id = $1)))"
 		if projectID != nil {
 			where += " AND d.project_id = $" + string(rune('0'+argIndex))
 			args = append(args, *projectID)
@@ -514,7 +514,7 @@ func (r *DocumentationRepo) GetDocumentForUser(ctx context.Context, documentID, 
 				f.original_name, f.mime_type, f.size_bytes, f.storage_path, f.checksum_sha256
 			FROM documentation_documents d
 			JOIN files f ON d.file_id = f.id
-			WHERE d.id = $1 AND f.owner_id = $2
+			WHERE d.id = $1 AND (f.owner_id = $2 OR EXISTS (SELECT 1 FROM projects pr WHERE pr.id = d.project_id AND (pr.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = pr.id AND pa.user_id = $2) OR EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin'))))
 		`
 		d = &model.DocumentWithFile{}
 		var wellIDPtr *uuid.UUID
@@ -598,7 +598,7 @@ func (r *DocumentationRepo) UpdateDocument(ctx context.Context, documentID, user
 		err := tx.QueryRow(ctx, `
 			SELECT d.id FROM documentation_documents d
 			JOIN files f ON d.file_id = f.id
-			WHERE d.id = $1 AND f.owner_id = $2
+			WHERE d.id = $1 AND (f.owner_id = $2 OR EXISTS (SELECT 1 FROM projects pr WHERE pr.id = d.project_id AND (pr.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = pr.id AND pa.user_id = $2) OR EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin'))))
 		`, documentID, userID).Scan(&dummy)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -649,7 +649,7 @@ func (r *DocumentationRepo) UpdateDocument(ctx context.Context, documentID, user
 		args = append(args, documentID, userID)
 
 		query := `UPDATE documentation_documents SET ` + joinStrings(setParts, ", ") + `
-			WHERE id = $` + string(rune('0'+argIndex)) + ` AND file_id IN (SELECT id FROM files WHERE owner_id = $` + string(rune('0'+argIndex+1)) + `)
+			WHERE id = $` + string(rune('0'+argIndex)) + `
 			RETURNING id, project_id, well_id, file_id, title, category, description, document_date, created_at, updated_at`
 		d := &model.DocumentWithFile{}
 		var wellIDPtr *uuid.UUID
@@ -673,7 +673,7 @@ func (r *DocumentationRepo) DeleteDocument(ctx context.Context, documentID, user
 		err := tx.QueryRow(ctx, `
 			SELECT d.file_id FROM documentation_documents d
 			JOIN files f ON d.file_id = f.id
-			WHERE d.id = $1 AND f.owner_id = $2
+			WHERE d.id = $1 AND (f.owner_id = $2 OR EXISTS (SELECT 1 FROM projects pr WHERE pr.id = d.project_id AND (pr.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = pr.id AND pa.user_id = $2) OR EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin'))))
 		`, documentID, userID).Scan(&fileID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -792,3 +792,9 @@ func (r *DocumentationRepo) CreateDocumentWithTx(ctx context.Context, tx databas
 	d.WellID = wellIDPtr
 	return nil
 }
+
+
+
+
+
+

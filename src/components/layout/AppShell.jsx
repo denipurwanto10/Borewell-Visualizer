@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Menu, X, PanelLeftClose, PanelLeftOpen, Download, RotateCcw, LogOut,
   LayoutDashboard, FolderOpen, Ruler, ClipboardList, Images, FileText,
-  Layers, Droplets, Database, Settings, Shield, FolderTree,
+  Layers, Droplets, Database, Settings, Shield, FolderTree, ChevronRight,
 } from 'lucide-react';
 import { Button, Toast } from '../Primitives';
 import logo from '../../../img/tubes.png';
@@ -25,6 +25,54 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Pengaturan', short: 'Setelan', icon: Settings, available: false },
   { id: 'admin-approval', label: 'Persetujuan Admin', short: 'Admin', icon: Shield, available: true },
 ];
+
+const NAV_GROUPS = [
+  { label: 'Utama', ids: ['dashboard', 'projects', 'project-docs'] },
+  { label: 'Pekerjaan sumur', ids: ['visualisasi', 'desain', 'data', 'docs', 'documentation', 'geology', 'monitoring'] },
+  { label: 'Sistem', ids: ['reports', 'data-management', 'settings', 'admin-approval'] },
+].map((g) => ({ ...g, items: g.ids.map((id) => NAV_ITEMS.find((i) => i.id === id)).filter(Boolean) }));
+
+const initialsOf = (user) => {
+  const src = (user?.full_name || user?.fullName || user?.email || '?').trim();
+  const parts = src.split(/[\s@._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] || '?') + (parts[1]?.[0] || '')).toUpperCase();
+};
+
+function ContextCard({ project, well }) {
+  return (
+    <div className="active-context">
+      <div className="ctx-row">
+        <span className="ctx-ico" aria-hidden="true"><FolderOpen size={15} strokeWidth={1.9} /></span>
+        <span className="ctx-text">
+          <span className="context-label">Proyek aktif</span>
+          <span className="context-value" title={project || undefined}>{project || '—'}</span>
+        </span>
+      </div>
+      <div className="ctx-row">
+        <span className="ctx-ico is-water" aria-hidden="true"><Droplets size={15} strokeWidth={1.9} /></span>
+        <span className="ctx-text">
+          <span className="context-label">Sumur aktif</span>
+          <span className="context-value" title={well || undefined}>{well || '—'}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function UserChip({ user, logout }) {
+  return (
+    <div className="user-chip">
+      <span className="avatar" aria-hidden="true">{initialsOf(user)}</span>
+      <span className="user-meta">
+        <strong>{user.full_name || user.fullName || user.email}</strong>
+        <small>{user.role === 'admin' ? 'Administrator' : 'Pengguna'}</small>
+      </span>
+      <button type="button" className="icon-btn user-logout" aria-label="Keluar" title="Keluar" onClick={logout}>
+        <LogOut size={17} strokeWidth={1.9} />
+      </button>
+    </div>
+  );
+}
 
 const TAB_ITEMS = NAV_ITEMS.filter((i) => ['dashboard', 'projects', 'visualisasi', 'desain'].includes(i.id));
 
@@ -56,39 +104,11 @@ export default function AppShell({
   canvasRef,
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
-  const navRef = useRef(null);
-  const [navInd, setNavInd] = useState(null);
-
-  // Penanda aktif sidebar: satu elemen yang bergeser mulus antar menu
-  useLayoutEffect(() => {
-    const measure = () => {
-      const li = navRef.current?.querySelector('.sidebar-item.is-active');
-      setNavInd(li && li.offsetHeight ? { y: li.offsetTop, h: li.offsetHeight } : null);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    const t = setTimeout(measure, 480); // setelah rail/sidebar selesai berubah lebar
-    return () => { window.removeEventListener('resize', measure); clearTimeout(t); };
-  }, [page, railCollapsed]);
-
-  // Tabel di ponsel menjadi kartu: isi data-label dari header kolom
-  useEffect(() => {
-    let raf = 0;
-    const label = () => {
-      document.querySelectorAll('table.data-table, table.admin-table').forEach((table) => {
-        const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
-        table.querySelectorAll('tbody tr').forEach((tr) => {
-          [...tr.children].forEach((td, i) => {
-            if (heads[i] && td.getAttribute('data-label') !== heads[i] && !td.hasAttribute('colspan')) td.setAttribute('data-label', heads[i]);
-          });
-        });
-      });
-    };
-    const obs = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(label); });
-    obs.observe(document.body, { childList: true, subtree: true });
-    label();
-    return () => { obs.disconnect(); cancelAnimationFrame(raf); };
-  }, []);
+  const drawerRows = NAV_GROUPS.flatMap((g, gi) => [
+    { heading: g.label, n: gi },
+    ...g.items.map((it, ii) => ({ ...it, n: gi + ii + 1 })),
+  ]);
+  const pageLabel = NAV_ITEMS.find((i) => i.id === page)?.label || 'Sumur Bor';
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 6);
@@ -134,38 +154,39 @@ export default function AppShell({
           </button>
         </div>
 
-        <ul className="sidebar-nav" ref={navRef}>
-          <li className="nav-ind" role="presentation" aria-hidden="true"
-            style={navInd ? { transform: `translateY(${navInd.y}px)`, height: navInd.h, opacity: 1 } : { opacity: 0 }} />
-          {NAV_ITEMS.map(({ id, label, icon: Icon, available }) => {
-            const isActive = page === id;
-            const disabled = !available;
-            return (
-              <li key={id} className={`sidebar-item ${isActive ? 'is-active' : ''} ${disabled ? 'is-disabled' : ''}`}>
-                <button
-                  type="button"
-                  onClick={() => handleNavClick(id)}
-                  disabled={disabled}
-                  className="sidebar-btn"
-                  title={label}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon size={19} strokeWidth={2} className="sidebar-icon" />
-                  <span className="sidebar-label">{label}</span>
-                  {!available && <span className="sidebar-badge">Baru</span>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <nav className="sidebar-scroll" aria-label="Menu utama">
+          {NAV_GROUPS.map((group) => (
+            <section className="sidebar-group" key={group.label}>
+              <h2 className="sidebar-heading">{group.label}</h2>
+              <ul className="sidebar-nav">
+                {group.items.map(({ id, label, icon: Icon, available }) => {
+                  const isActive = page === id;
+                  const disabled = !available;
+                  return (
+                    <li key={id} className={`sidebar-item ${isActive ? 'is-active' : ''} ${disabled ? 'is-disabled' : ''}`} data-tip={label}>
+                      <button
+                        type="button"
+                        onClick={() => handleNavClick(id)}
+                        disabled={disabled}
+                        className="sidebar-btn"
+                        title={label}
+                        aria-current={isActive ? 'page' : undefined}
+                      >
+                        <Icon size={19} strokeWidth={1.9} className="sidebar-icon" />
+                        <span className="sidebar-label">{label}</span>
+                        {!available && <span className="sidebar-badge">Baru</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </nav>
 
         <div className="sidebar-footer">
-          <div className="active-context">
-            <div className="context-label">Proyek aktif</div>
-            <div className="context-value">{activeProject?.projectName || '—'}</div>
-            <div className="context-label">Sumur aktif</div>
-            <div className="context-value">{activeWell?.well?.wellName || '—'}</div>
-          </div>
+          <ContextCard project={activeProject?.projectName} well={activeWell?.well?.wellName} />
+          {isAuthenticated && user && <UserChip user={user} logout={logout} />}
         </div>
       </aside>
 
@@ -178,13 +199,21 @@ export default function AppShell({
             <div className="brand">
               <span className="brand-mark"><img src={logo} alt="" width="24" height="24" /></span>
               <span className="brand-text">
-                <strong>{activeProject?.projectName || 'Sumur Bor'}</strong>
-                <small>{activeWell?.well?.wellName ? `Sumur: ${activeWell.well.wellName}` : 'Belum ada sumur aktif'}</small>
+                <strong>{pageLabel}</strong>
+                <small>
+                  <span className="crumb">{activeProject?.projectName || 'Belum ada proyek'}</span>
+                  {activeWell?.well?.wellName && <><ChevronRight size={12} aria-hidden="true" /><span className="crumb is-well">{activeWell.well.wellName}</span></>}
+                </small>
               </span>
             </div>
           </div>
 
           <div className="topbar-actions">
+            <span className={`well-chip ${activeWellId ? 'is-on' : ''}`} role="status">
+              <i aria-hidden="true" />
+              <span>{activeWellId ? 'Sumur aktif' : 'Belum ada sumur aktif'}</span>
+            </span>
+            <span className="topbar-sep" aria-hidden="true" />
             {activeWellId && (
               <Button variant="ghost" icon={RotateCcw} onClick={resetAll} className="hide-sm" aria-label="Reset sumur ini">
                 Reset Sumur
@@ -198,12 +227,9 @@ export default function AppShell({
               <Button variant="ghost" icon={RotateCcw} onClick={resetAll} className="icon-only show-sm" aria-label="Reset sumur ini" />
             )}
             {isAuthenticated && (
-              <Button variant="ghost" icon={LogOut} onClick={logout} className="hide-sm" aria-label="Keluar">
-                Keluar
+              <Button variant="ghost" icon={LogOut} onClick={logout} className="topbar-logout" aria-label="Keluar">
+                <span className="hide-md">Keluar</span>
               </Button>
-            )}
-            {isAuthenticated && (
-              <Button variant="ghost" icon={LogOut} onClick={logout} className="icon-only show-sm" aria-label="Keluar" />
             )}
           </div>
         </div>
@@ -214,6 +240,7 @@ export default function AppShell({
       <div className={`drawer-layer ${drawerOpen ? 'is-open' : ''}`} aria-hidden={!drawerOpen}>
         <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} />
         <aside className="sidebar-drawer" role="dialog" aria-modal="true" aria-label="Menu navigasi">
+          <span className="sheet-grip" aria-hidden="true" />
           <div className="drawer-header">
             <span className="drawer-brand">
               <span className="drawer-brand-mark"><img src={logo} alt="" width="24" height="24" /></span>
@@ -224,37 +251,33 @@ export default function AppShell({
             </button>
           </div>
           <ul className="drawer-nav">
-            {NAV_ITEMS.map(({ id, label, icon: Icon, available }) => {
-              const isActive = page === id;
-              return (
-                <li key={id} className={`drawer-item ${isActive ? 'is-active' : ''} ${!available ? 'is-disabled' : ''}`}>
-                  <button
-                    type="button"
-                    onClick={() => handleNavClick(id)}
-                    disabled={!available}
-                    className="drawer-btn"
-                    aria-current={isActive ? 'page' : undefined}
-                    tabIndex={drawerOpen ? 0 : -1}
-                  >
-                    <Icon size={20} strokeWidth={2} className="drawer-icon" />
-                    <span className="drawer-label">{label}</span>
-                    {!available && <span className="drawer-badge">Baru</span>}
-                  </button>
-                </li>
-              );
-            })}
+            {drawerRows.map((row) => row.heading ? (
+              <li key={`h-${row.heading}`} className="drawer-heading" style={{ '--n': row.n }}>{row.heading}</li>
+            ) : (
+              <li key={row.id} className={`drawer-item ${page === row.id ? 'is-active' : ''} ${!row.available ? 'is-disabled' : ''}`} style={{ '--n': row.n }}>
+                <button
+                  type="button"
+                  onClick={() => handleNavClick(row.id)}
+                  disabled={!row.available}
+                  className="drawer-btn"
+                  aria-current={page === row.id ? 'page' : undefined}
+                  tabIndex={drawerOpen ? 0 : -1}
+                >
+                  <row.icon size={20} strokeWidth={2} className="drawer-icon" />
+                  <span className="drawer-label">{row.label}</span>
+                  {!row.available && <span className="drawer-badge">Baru</span>}
+                </button>
+              </li>
+            ))}
           </ul>
           <div className="drawer-footer">
-            <div className="context-label">Proyek aktif</div>
-            <div className="context-value">{activeProject?.projectName || '—'}</div>
-            <div className="context-label">Sumur aktif</div>
-            <div className="context-value">{activeWell?.well?.wellName || '—'}</div>
+            <ContextCard project={activeProject?.projectName} well={activeWell?.well?.wellName} />
+            {isAuthenticated && user && <UserChip user={user} logout={() => { setDrawerOpen(false); logout(); }} />}
           </div>
         </aside>
       </div>
 
-      <nav className="tabbar" aria-label="Navigasi cepat" style={{ '--i': Math.max(0, TAB_ITEMS.findIndex((t) => t.id === page)) }}>
-        <span className="tabbar-ind" aria-hidden="true" data-on={TAB_ITEMS.some((t) => t.id === page)} />
+      <nav className="tabbar" aria-label="Navigasi cepat">
         {TAB_ITEMS.map(({ id, short, icon: Icon }) => (
           <button
             key={id}
@@ -266,7 +289,14 @@ export default function AppShell({
             <Icon size={20} strokeWidth={1.9} /><span>{short}</span>
           </button>
         ))}
-        <button type="button" onClick={() => setDrawerOpen(true)} aria-label="Menu lainnya">
+        <button
+          type="button"
+          className={!TAB_ITEMS.some((t) => t.id === page) || drawerOpen ? 'is-active' : ''}
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Menu lainnya"
+          aria-haspopup="dialog"
+          aria-expanded={drawerOpen}
+        >
           <Menu size={20} strokeWidth={1.9} /><span>Menu</span>
         </button>
       </nav>

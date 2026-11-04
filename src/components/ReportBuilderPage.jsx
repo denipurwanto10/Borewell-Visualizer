@@ -328,7 +328,7 @@ export default function ReportBuilderPage({ notify }) {
   return (
     <div className="report-builder-page">
       <PageHead kicker={`Sumur: ${well?.wellCode}`} title="Pembuat Laporan Penyelesaian" description="Konfigurasikan bagian laporan, pilih foto, dan atur identitas sebelum mengekspor PDF.">
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="head-actions">
           <Button variant="ghost" icon={Eye} onClick={handlePreview} disabled={generating}>Pratinjau</Button>
           <Button variant="primary" icon={Download} loading={generating} onClick={handleGeneratePdf} disabled={generating}>
             {generating ? 'Menyiapkan...' : 'Unduh PDF'}

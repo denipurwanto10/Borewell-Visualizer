@@ -1,0 +1,88 @@
+/* ==========================================================================
+   mobile-nav.css — Navigasi mobile (≤ 820px): bottom bar + bottom sheet.
+   Dimuat PALING AKHIR. Sidebar/hamburger TIDAK dipakai di HP; semua menu
+   diakses lewat tab bar bawah (4 pintasan + "Menu" yang membuka sheet).
+   Tablet (821–1099px) tetap memakai drawer samping, desktop memakai sidebar.
+   ========================================================================== */
+
+/* panel properti: dipakai di semua ukuran */
+.properties-panel { gap: 0; align-content: start; overflow: hidden; }
+.properties-panel .panel-head { justify-content: flex-start; gap: 10px; padding: 12px 14px; }
+.properties-panel .panel-head h2 { flex: 1; min-width: 0; margin: 0; font-size: 16px; line-height: 1.2; }
+.properties-panel .type-badge { flex: none; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.properties-grid { padding: 14px; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.properties-grid .col-2 { grid-column: 1 / -1; }
+.properties-grid .field-hint { font-size: 11.5px; line-height: 1.35; }
+.property-actions { padding: 12px 14px 14px; gap: 10px; }
+.prop-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 11px;
+  background: var(--card-2); font-size: 14px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+}
+.prop-toggle input { width: 20px; height: 20px; accent-color: var(--teal); flex: none; }
+.action-row .btn { min-width: 0; justify-content: center; }
+
+@media (max-width: 820px) {
+  :root { --tab-h: 60px; }
+
+  /* ---------- Topbar: ringkas, tanpa hamburger & tombol keluar ---------- */
+  .menu-toggle, .topbar-logout { display: none !important; }
+  .topbar-inner { min-height: 58px; padding: 8px 14px; gap: 10px; }
+  .topbar-left { flex: 1 1 0; min-width: 0; }
+  .brand { flex: 1; min-width: 0; }
+  .brand-text strong { max-width: 100%; font-size: 18px; }
+  .brand-text small .crumb { max-width: 42vw; }
+  .topbar-actions { padding: 3px; gap: 2px; border-radius: 14px; }
+  .topbar-actions .btn { --h: 38px; border-radius: 11px; }
+  .topbar-actions .btn.icon-only { width: 38px; }
+
+  /* ---------- Tab bar: menempel di dasar layar ---------- */
+  .tabbar {
+    left: 0; right: 0; bottom: 0; height: calc(var(--tab-h) + var(--safe-b));
+    padding: 0 8px var(--safe-b); border-radius: 0; border: 0; border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--card) 94%, transparent);
+    -webkit-backdrop-filter: saturate(1.5) blur(18px); backdrop-filter: saturate(1.5) blur(18px);
+    box-shadow: none; animation: none;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .tabbar > button { margin: 6px 2px; border-radius: 14px; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--mute); }
+  .tabbar > button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabbar > button.is-active { background: var(--teal-soft); color: var(--teal-2); box-shadow: none; }
+  .tabbar > button.is-active svg { transform: none; }
+
+  /* ruang bawah agar konten tidak tertutup tab bar */
+  .main { padding-bottom: calc(var(--tab-h) + var(--safe-b) + 24px); }
+  .toast-wrap { bottom: calc(var(--tab-h) + var(--safe-b) + 12px); }
+  .designer-actions { bottom: calc(var(--tab-h) + var(--safe-b) + 8px); }
+
+  /* ---------- Menu: bottom sheet (bukan sidebar) ---------- */
+  .sidebar-drawer {
+    inset: auto 0 0 0; width: 100%; max-height: min(84dvh, 680px);
+    border-radius: 22px 22px 0 0; border: 0; border-top: 1px solid var(--ring);
+    box-shadow: 0 -18px 50px -24px rgba(21, 32, 30, .5);
+    transform: translateY(104%); transition: transform .38s var(--ease-out);
+    padding-top: 0;
+  }
+  .drawer-layer.is-open .sidebar-drawer { transform: none; }
+  .sheet-grip { display: block; flex: none; width: 38px; height: 4px; margin: 8px auto 0; border-radius: 4px; background: var(--line-2); }
+  .drawer-header { padding: 8px 16px 6px; }
+  .drawer-header::after { display: none; }
+  .drawer-nav {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+    padding: 2px 14px 12px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  }
+  .drawer-layer .drawer-heading { grid-column: 1 / -1; opacity: 1; transform: none; padding: 12px 2px 2px; transition: none; }
+  .drawer-layer .drawer-item { position: relative; opacity: 1; transform: none; transition: none; }
+  .drawer-btn {
+    width: 100%; min-height: 78px; padding: 10px 6px; gap: 6px; border-radius: 14px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    border: 1px solid var(--line); background: var(--card-2);
+  }
+  .drawer-item.is-active .drawer-btn { background: var(--teal-soft); border-color: var(--teal-ring); }
+  .drawer-icon { width: 20px; height: 20px; padding: 6px; }
+  .drawer-label { font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; }
+  .drawer-badge { position: absolute; top: 6px; right: 6px; }
+  .drawer-footer { padding: 10px 14px calc(12px + var(--safe-b)); }
+  .drawer-footer .active-context { display: none; }
+}
+@media (min-width: 821px) { .sheet-grip { display: none; } }

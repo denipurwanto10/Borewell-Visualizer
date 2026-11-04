@@ -51,7 +51,7 @@ func New(cfg *config.Config, h *handler.Handler) *gin.Engine {
 
 		authRoutes := api.Group("/auth")
 		{
-			authRoutes.POST("/register", h.AuthHandler().Register)
+			// Public self-registration is disabled; accounts are created by admins.
 			authRoutes.POST("/login", h.AuthHandler().Login)
 			authRoutes.GET("/me", auth.AuthMiddleware(cfg), h.AuthHandler().Me)
 
@@ -69,10 +69,16 @@ func New(cfg *config.Config, h *handler.Handler) *gin.Engine {
 		{
 			adminRoutes.GET("/users/pending", h.AdminHandler().ListPending)
 			adminRoutes.GET("/users", h.AdminHandler().ListAll)
+			adminRoutes.POST("/users", h.AdminHandler().CreateUser)
 			adminRoutes.POST("/users/:id/approve", h.AdminHandler().Approve)
 			adminRoutes.POST("/users/:id/reject", h.AdminHandler().Reject)
 			adminRoutes.POST("/users/:id/suspend", h.AdminHandler().Suspend)
 			adminRoutes.POST("/users/:id/unsuspend", h.AdminHandler().Unsuspend)
+
+			adminRoutes.GET("/projects/:id/assignments", h.ProjectHandler().ListAssignments)
+			adminRoutes.POST("/projects/:id/assignments", h.ProjectHandler().CreateAssignment)
+			adminRoutes.PUT("/projects/:id/assignments/:userId", h.ProjectHandler().UpdateAssignment)
+			adminRoutes.DELETE("/projects/:id/assignments/:userId", h.ProjectHandler().DeleteAssignment)
 		}
 
 		// Project Management API (FS3)

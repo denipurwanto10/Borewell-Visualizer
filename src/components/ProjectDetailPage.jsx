@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Filter, ChevronDown, MoreHorizontal, Edit, Trash2, Copy, RotateCcw, ExternalLink, ArrowLeft, Loader2 } from 'lucide-react';
-import { Button, Field, PageHead, RowMenu, useConfirm } from '../components/Primitives';
+import { Button, Field, PageHead, useConfirm, ActionMenu } from '../components/Primitives';
 import { useProject } from '../context/ProjectContext';
 import { getWellData } from '../storage/projectStorage';
 
@@ -43,19 +43,19 @@ function WellRow({ well, onEdit, onDelete, onDuplicate, onOpen, confirm }) {
           <span>{WELL_TYPE_LABELS[well.wellType] || well.wellType}</span>
         </div>
       </td>
-      <td><StatusBadge status={well.status} /></td>
-      <td className="mono">{well.plannedDepth || '-'}</td>
-      <td className="mono">{well.actualDepth || '-'}</td>
-      <td className="mono coords">{well.latitude && well.longitude ? `${Number(well.latitude).toFixed(4)}, ${Number(well.longitude).toFixed(4)}` : '-'}</td>
-      <td className="mono">{well.drillingDate ? new Date(well.drillingDate).toLocaleDateString('id-ID') : '-'}</td>
-      <td>
-        <RowMenu>
+      <td data-label="Status"><StatusBadge status={well.status} /></td>
+      <td className="mono" data-label="Rencana (m)">{well.plannedDepth || '-'}</td>
+      <td className="mono" data-label="Aktual (m)">{well.actualDepth || '-'}</td>
+      <td className="mono coords" data-label="Koordinat">{well.latitude && well.longitude ? `${Number(well.latitude).toFixed(4)}, ${Number(well.longitude).toFixed(4)}` : '-'}</td>
+      <td className="mono" data-label="Tgl. bor">{well.drillingDate ? new Date(well.drillingDate).toLocaleDateString('id-ID') : '-'}</td>
+      <td className="col-actions">
+        <ActionMenu icon={MoreHorizontal}>
             <button onClick={() => onOpen(well.id)}><ExternalLink size={16} /><span>Buka sumur</span></button>
             <button onClick={() => onEdit(well)}><Edit size={16} /><span>Edit</span></button>
             <button onClick={() => onDuplicate(well.id)}><Copy size={16} /><span>Duplikat</span></button>
             <hr />
             <button onClick={() => onDelete(well.id)} className="danger"><Trash2 size={16} /><span>Hapus</span></button>
-          </RowMenu>
+          </ActionMenu>
       </td>
     </tr>
   );
@@ -204,7 +204,7 @@ export default function ProjectDetailPage({ projectId }) {
   return (
     <div className="project-detail-page">
       <PageHead kicker={`Proyek: ${project.projectCode}`} title={project.projectName} description={project.description || project.location}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="head-actions">
           <Button variant="ghost" icon={ArrowLeft} onClick={() => window.history.back()}>Kembali</Button>
           <Button variant="primary" icon={Plus} onClick={openCreateForm}>Tambah Sumur</Button>
         </div>
@@ -251,7 +251,7 @@ export default function ProjectDetailPage({ projectId }) {
       </div>
 
       <div className="table-wrap">
-        <table className="data-table">
+        <table className="data-table is-cards">
           <thead>
             <tr>
               <th onClick={() => handleSort('wellCode')}>Sumur <ChevronDown size={14} /></th>

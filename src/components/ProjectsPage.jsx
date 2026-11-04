@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Filter, ChevronDown, MoreHorizontal, Edit, Trash2, Copy, Archive, RotateCcw, FolderOpen, ExternalLink, Loader2 } from 'lucide-react';
-import { Button, Field, PageHead, RowMenu, useConfirm } from '../components/Primitives';
+import { Button, Field, PageHead, useConfirm, ActionMenu } from '../components/Primitives';
 import { useProject } from '../context/ProjectContext';
 
 const STATUS_STYLES = {
@@ -37,12 +37,12 @@ function ProjectRow({ project, onEdit, onDelete, onDuplicate, onArchive, onResto
           <span>{project.location || '-'}</span>
         </div>
       </td>
-      <td><StatusBadge status={project.status} /></td>
-      <td className="mono">{project.wellCount || 0}</td>
-      <td className="mono">{project.startDate ? new Date(project.startDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
-      <td className="mono">{project.updatedAt ? new Date(project.updatedAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-      <td>
-        <RowMenu>
+      <td data-label="Status"><StatusBadge status={project.status} /></td>
+      <td className="mono" data-label="Jumlah sumur">{project.wellCount || 0}</td>
+      <td className="mono" data-label="Mulai">{project.startDate ? new Date(project.startDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
+      <td className="mono" data-label="Diperbarui">{project.updatedAt ? new Date(project.updatedAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+      <td className="col-actions">
+        <ActionMenu icon={MoreHorizontal}>
             <button onClick={() => onView(project.id)}><ExternalLink size={16} /><span>Lihat detail</span></button>
             <button onClick={() => onEdit(project)}><Edit size={16} /><span>Edit</span></button>
             <button onClick={() => onDuplicate(project.id)}><Copy size={16} /><span>Duplikat</span></button>
@@ -53,7 +53,7 @@ function ProjectRow({ project, onEdit, onDelete, onDuplicate, onArchive, onResto
             )}
             <hr />
             <button onClick={() => onDelete(project.id)} className="danger"><Trash2 size={16} /><span>Hapus</span></button>
-          </RowMenu>
+          </ActionMenu>
       </td>
     </tr>
   );
@@ -241,7 +241,7 @@ export default function ProjectsPage() {
       </div>
 
       <div className="table-wrap">
-        <table className="data-table">
+        <table className="data-table is-cards">
           <thead>
             <tr>
               <th onClick={() => handleSort('projectName')}>Proyek <ChevronDown size={14} /></th>

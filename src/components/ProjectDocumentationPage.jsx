@@ -391,18 +391,35 @@ export default function ProjectDocumentationPage({ notify }) {
   // Load documentation
   const loadDocumentation = useCallback(async () => {
     if (!activeProjectId) return;
-    if (isAuthenticated) {
+    if (!isAuthenticated) return;
+
+    try {
       // API mode: fetch from backend
       const [photoList, docList] = await Promise.all([
         photoAPI.list('project', activeProjectId),
         documentAPI.list('project', activeProjectId),
       ]);
-      setPhotos(photoList.data || photoList);
-      setDocuments(docList.data || docList);
+
+      // Normalize response: API returns { data: [...], meta: {...} }
+      // Ensure we always get an array, even if data is null/undefined
+      const normalize = (resp) => {
+        if (!resp) return [];
+        const data = resp.data;
+        if (Array.isArray(data)) return data;
+        // Handle legacy/erroneous responses where data might be the array directly
+        if (Array.isArray(resp)) return resp;
+        return [];
+      };
+
+      const photosArray = normalize(photoList);
+      const documentsArray = normalize(docList);
+
+      setPhotos(photosArray);
+      setDocuments(documentsArray);
 
       // Generate preview URLs
       const previewPromises = [];
-      [...(photoList.data || photoList), ...(docList.data || docList)].forEach(item => {
+      [...photosArray, ...documentsArray].forEach(item => {
         if (item.fileRef && isPreviewable(item.fileType)) {
           previewPromises.push(
             (async () => {
@@ -414,8 +431,13 @@ export default function ProjectDocumentationPage({ notify }) {
         }
       });
       await Promise.all(previewPromises);
+    } catch (error) {
+      notify(`Gagal memuat dokumentasi: ${error.message}`, 'error');
+      // Ensure state stays as valid arrays
+      setPhotos([]);
+      setDocuments([]);
     }
-  }, [activeProjectId, isAuthenticated]);
+  }, [activeProjectId, isAuthenticated, notify]);
 
   useEffect(() => {
     loadDocumentation();
@@ -630,7 +652,7 @@ export default function ProjectDocumentationPage({ notify }) {
   return (
     <div className="documentation-page">
       <PageHead kicker={`Proyek: ${project}`} title="Dokumentasi Proyek" description="Foto dan dokumen tingkat proyek (izin, kontrak, spesifikasi, dll.).">
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="head-actions">
           <div className="tally"><b className="mono">{totalItems}</b><span> item</span></div>
           <Button variant="primary" icon={Camera} onClick={() => setShowPhotoUpload(true)}>Tambah Foto</Button>
           <Button variant="soft" icon={FileText} onClick={() => setShowDocumentUpload(true)}>Tambah Dokumen</Button>
@@ -652,11 +674,11 @@ export default function ProjectDocumentationPage({ notify }) {
             <Search className="search-icon" size={18} />
             <input type="text" placeholder="Cari nama, deskripsi..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Field as="select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="filter-select" style={{ minWidth: '180px' }}>
+          <Field as="select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="filter-select">
             <option value="all">Semua kategori</option>
             {(activeTab === 'photos' ? PHOTO_CATEGORIES : DOCUMENT_CATEGORIES).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </Field>
-          <Field as="select" value={sortBy} onChange={e => setSortBy(e.target.value)} className="filter-select" style={{ minWidth: '160px' }}>
+          <Field as="select" value={sortBy} onChange={e => setSortBy(e.target.value)} className="filter-select">
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Field>
           <div className="view-toggle" role="group" aria-label="Mode tampilan">

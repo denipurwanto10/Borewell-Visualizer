@@ -3,13 +3,14 @@ package repository
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
+	"github.com/borewell/visualizer/backend/internal/database"
+	"github.com/borewell/visualizer/backend/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/borewell/visualizer/backend/internal/database"
-	"github.com/borewell/visualizer/backend/internal/model"
 )
 
 type WellRepo struct {
@@ -53,7 +54,7 @@ func (r *WellRepo) GetByIDForUser(ctx context.Context, wellID, userID uuid.UUID)
 				w.created_at, w.updated_at
 			FROM wells w
 			JOIN projects p ON w.project_id = p.id
-			WHERE w.id = $1 AND p.owner_id = $2
+			WHERE w.id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2)) OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`
 		w = &model.Well{}
 		err := tx.QueryRow(ctx, query, wellID, userID).Scan(
@@ -78,22 +79,22 @@ func (r *WellRepo) ListForProject(ctx context.Context, projectID, userID uuid.UU
 	err := r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
 		offset := (page - 1) * pageSize
 
-		where := "WHERE w.project_id = $1 AND p.owner_id = $2"
+		where := "WHERE w.project_id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2)) OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))"
 		args := []any{projectID, userID}
 		argIndex := 3
 
 		if statusFilter != "" {
-			where += " AND w.status = $" + string(rune('0'+argIndex))
+			where += " AND w.status = $" + strconv.Itoa(argIndex)
 			args = append(args, statusFilter)
 			argIndex++
 		}
 		if typeFilter != "" {
-			where += " AND w.well_type = $" + string(rune('0'+argIndex))
+			where += " AND w.well_type = $" + strconv.Itoa(argIndex)
 			args = append(args, typeFilter)
 			argIndex++
 		}
 		if search != "" {
-			where += " AND (w.well_name ILIKE $" + string(rune('0'+argIndex)) + " OR w.well_code ILIKE $" + string(rune('0'+argIndex+1)) + ")"
+			where += " AND (w.well_name ILIKE $" + strconv.Itoa(argIndex) + " OR w.well_code ILIKE $" + strconv.Itoa(argIndex+1) + ")"
 			args = append(args, "%"+search+"%", "%"+search+"%")
 			argIndex += 2
 		}
@@ -118,7 +119,7 @@ func (r *WellRepo) ListForProject(ctx context.Context, projectID, userID uuid.UU
 			FROM wells w
 			JOIN projects p ON w.project_id = p.id ` + where + `
 			ORDER BY w.` + sortBy + ` ` + sortDir + `
-			LIMIT $` + string(rune('0'+argIndex)) + ` OFFSET $` + string(rune('0'+argIndex+1))
+			LIMIT $` + strconv.Itoa(argIndex) + ` OFFSET $` + strconv.Itoa(argIndex+1)
 		args = append(args, pageSize, offset)
 
 		rows, err := tx.Query(ctx, query, args...)
@@ -149,7 +150,7 @@ func (r *WellRepo) Update(ctx context.Context, wellID, userID uuid.UUID, updates
 		// Verify ownership via project
 		err := tx.QueryRow(ctx, `
 			SELECT w.id FROM wells w JOIN projects p ON w.project_id = p.id
-			WHERE w.id = $1 AND p.owner_id = $2
+			WHERE w.id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR p.owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2)) OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = p.id AND pa.user_id = $2))
 		`, wellID, userID).Scan(new(uuid.UUID))
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -162,7 +163,7 @@ func (r *WellRepo) Update(ctx context.Context, wellID, userID uuid.UUID, updates
 		args := []any{}
 		argIndex := 1
 		for k, v := range updates {
-			setParts = append(setParts, k+" = $"+string(rune('0'+argIndex)))
+			setParts = append(setParts, k+" = $"+strconv.Itoa(argIndex))
 			args = append(args, v)
 			argIndex++
 		}
@@ -175,7 +176,7 @@ func (r *WellRepo) Update(ctx context.Context, wellID, userID uuid.UUID, updates
 		args = append(args, wellID)
 
 		query := `UPDATE wells SET ` + joinStrings(setParts, ", ") + `
-			WHERE id = $` + string(rune('0'+argIndex)) + `
+			WHERE id = $` + strconv.Itoa(argIndex) + `
 			RETURNING id, project_id, well_code, well_name, well_type, location, latitude, longitude,
 				planned_depth, actual_depth, drilling_date, completion_date, status, description,
 				created_at, updated_at`
@@ -201,7 +202,7 @@ func (r *WellRepo) Delete(ctx context.Context, wellID, userID uuid.UUID) error {
 	return r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
 		result, err := tx.Exec(ctx, `
 			DELETE FROM wells WHERE id = $1 AND project_id IN (
-				SELECT id FROM projects WHERE owner_id = $2
+				SELECT id FROM projects WHERE (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = projects.id AND pa.user_id = $2))
 			)
 		`, wellID, userID)
 		if err != nil {

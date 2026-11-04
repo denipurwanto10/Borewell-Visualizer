@@ -742,7 +742,7 @@ export default function DocumentationPage({ notify }) {
   return (
     <div className="documentation-page">
       <PageHead kicker={`Sumur: ${well?.wellCode}`} title="Dokumentasi Sumur" description="Foto kegiatan dan dokumen pendukung konstruksi sumur.">
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="head-actions">
           <div className="tally"><b className="mono">{totalItems}</b><span> item</span></div>
           <Button variant="primary" icon={Camera} onClick={() => setShowPhotoUpload(true)}>Tambah Foto</Button>
           <Button variant="soft" icon={FileText} onClick={() => setShowDocumentUpload(true)}>Tambah Dokumen</Button>
@@ -771,11 +771,11 @@ export default function DocumentationPage({ notify }) {
             <Search className="search-icon" size={18} />
             <input type="text" placeholder="Cari nama, deskripsi..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Field as="select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="filter-select" style={{ minWidth: '180px' }}>
+          <Field as="select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="filter-select">
             <option value="all">Semua kategori</option>
             {(activeTab === 'photos' ? PHOTO_CATEGORIES : DOCUMENT_CATEGORIES).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </Field>
-          <Field as="select" value={sortBy} onChange={e => setSortBy(e.target.value)} className="filter-select" style={{ minWidth: '160px' }}>
+          <Field as="select" value={sortBy} onChange={e => setSortBy(e.target.value)} className="filter-select">
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Field>
           <div className="view-toggle" role="group" aria-label="Mode tampilan">

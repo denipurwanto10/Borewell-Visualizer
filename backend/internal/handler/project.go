@@ -12,14 +12,16 @@ import (
 )
 
 type ProjectHandler struct {
-	projectRepo *repository.ProjectRepo
-	wellRepo    *repository.WellRepo
+	projectRepo     *repository.ProjectRepo
+	wellRepo        *repository.WellRepo
+	assignmentRepo  *repository.AssignmentRepo
 }
 
-func NewProjectHandler(projectRepo *repository.ProjectRepo, wellRepo *repository.WellRepo) *ProjectHandler {
+func NewProjectHandler(projectRepo *repository.ProjectRepo, wellRepo *repository.WellRepo, assignmentRepo *repository.AssignmentRepo) *ProjectHandler {
 	return &ProjectHandler{
-		projectRepo: projectRepo,
-		wellRepo:    wellRepo,
+		projectRepo:    projectRepo,
+		wellRepo:       wellRepo,
+		assignmentRepo: assignmentRepo,
 	}
 }
 
@@ -184,7 +186,7 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		if err == repository.ErrProjectCodeExists {
 			c.JSON(http.StatusConflict, errorResponse("conflict", "Conflict", 409, "Project code already exists", c.Request.URL.Path))
 		} else {
-			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to create project", c.Request.URL.Path))
+			c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, err.Error(), c.Request.URL.Path))
 		}
 		return
 	}
@@ -658,6 +660,140 @@ func (h *WellHandler) DeleteWell(c *gin.Context) {
 		return
 	}
 
+	c.Status(http.StatusNoContent)
+}
+
+// --- Project Assignment Handlers (Admin) ---
+
+type AssignmentListItem struct {
+	ID         uuid.UUID `json:"id"`
+	ProjectID  uuid.UUID `json:"project_id"`
+	UserID     uuid.UUID `json:"user_id"`
+	Permission string    `json:"permission"`
+	CreatedAt  string    `json:"created_at"`
+}
+
+func (h *ProjectHandler) ListAssignments(c *gin.Context) {
+	projectID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid project ID", c.Request.URL.Path))
+		return
+	}
+	assignments, err := h.assignmentRepo.ListByProject(c.Request.Context(), projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to list assignments", c.Request.URL.Path))
+		return
+	}
+	items := make([]AssignmentListItem, 0, len(assignments))
+	for _, a := range assignments {
+		items = append(items, AssignmentListItem{
+			ID:         a.ID,
+			ProjectID:  a.ProjectID,
+			UserID:     a.UserID,
+			Permission: a.Permission,
+			CreatedAt:  a.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+type CreateAssignmentRequest struct {
+	UserID     uuid.UUID `json:"user_id" binding:"required"`
+	Permission string    `json:"permission" binding:"required"`
+}
+
+func (h *ProjectHandler) CreateAssignment(c *gin.Context) {
+	adminID, _ := c.Get("user_id")
+	projectID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid project ID", c.Request.URL.Path))
+		return
+	}
+	var req CreateAssignmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, errorResponse("validation-failed", "Validation Failed", 422, "Invalid request body", c.Request.URL.Path))
+		return
+	}
+	if req.Permission != "view" && req.Permission != "edit" {
+		c.JSON(http.StatusUnprocessableEntity, errorResponse("validation-failed", "Validation Failed", 422, "Permission must be view or edit", c.Request.URL.Path))
+		return
+	}
+	var assignedBy *uuid.UUID
+	if id, ok := adminID.(uuid.UUID); ok {
+		assignedBy = &id
+	}
+	a := &repository.ProjectAssignment{
+		ID:         uuid.New(),
+		ProjectID:  projectID,
+		UserID:     req.UserID,
+		Permission: req.Permission,
+		AssignedBy: assignedBy,
+	}
+	if err := h.assignmentRepo.Create(c.Request.Context(), a); err != nil {
+		if err == repository.ErrAssignmentExists {
+			c.JSON(http.StatusConflict, errorResponse("conflict", "Conflict", 409, "Assignment already exists", c.Request.URL.Path))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to create assignment", c.Request.URL.Path))
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": a})
+}
+
+type UpdateAssignmentRequest struct {
+	Permission string `json:"permission" binding:"required"`
+}
+
+func (h *ProjectHandler) UpdateAssignment(c *gin.Context) {
+	projectID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid project ID", c.Request.URL.Path))
+		return
+	}
+	userID, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid user ID", c.Request.URL.Path))
+		return
+	}
+	var req UpdateAssignmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, errorResponse("validation-failed", "Validation Failed", 422, "Invalid request body", c.Request.URL.Path))
+		return
+	}
+	if req.Permission != "view" && req.Permission != "edit" {
+		c.JSON(http.StatusUnprocessableEntity, errorResponse("validation-failed", "Validation Failed", 422, "Permission must be view or edit", c.Request.URL.Path))
+		return
+	}
+	if err := h.assignmentRepo.UpdatePermission(c.Request.Context(), projectID, userID, req.Permission); err != nil {
+		if err == repository.ErrAssignmentNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Assignment not found", c.Request.URL.Path))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to update assignment", c.Request.URL.Path))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"project_id": projectID, "user_id": userID, "permission": req.Permission}})
+}
+
+func (h *ProjectHandler) DeleteAssignment(c *gin.Context) {
+	projectID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid project ID", c.Request.URL.Path))
+		return
+	}
+	userID, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errorResponse("invalid-request", "Invalid Request", 400, "Invalid user ID", c.Request.URL.Path))
+		return
+	}
+	if err := h.assignmentRepo.Delete(c.Request.Context(), projectID, userID); err != nil {
+		if err == repository.ErrAssignmentNotFound {
+			c.JSON(http.StatusNotFound, errorResponse("not-found", "Not Found", 404, "Assignment not found", c.Request.URL.Path))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, errorResponse("internal-error", "Internal Server Error", 500, "Failed to delete assignment", c.Request.URL.Path))
+		return
+	}
 	c.Status(http.StatusNoContent)
 }
 

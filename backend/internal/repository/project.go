@@ -65,7 +65,7 @@ func (r *ProjectRepo) GetByIDForUser(ctx context.Context, projectID, userID uuid
 				location, province, district, village, latitude, longitude, description,
 				start_date, end_date, status, created_at, updated_at, archived_at
 			FROM projects
-			WHERE id = $1 AND owner_id = $2
+			WHERE id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR owner_id = $2 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = projects.id AND pa.user_id = $2))
 		`
 		p = &model.Project{}
 		err := tx.QueryRow(ctx, query, projectID, userID).Scan(
@@ -90,7 +90,7 @@ func (r *ProjectRepo) ListForUser(ctx context.Context, userID uuid.UUID, page, p
 	err := r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
 		offset := (page - 1) * pageSize
 
-		where := "WHERE owner_id = $1"
+		where := "WHERE (EXISTS (SELECT 1 FROM users u WHERE u.id = $1 AND u.role = 'admin') OR owner_id = $1 OR EXISTS (SELECT 1 FROM project_assignments pa WHERE pa.project_id = projects.id AND pa.user_id = $1))"
 		args := []any{userID}
 		argIndex := 2
 
@@ -159,7 +159,7 @@ func (r *ProjectRepo) Update(ctx context.Context, projectID, userID uuid.UUID, u
 	err := r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
 		// Verify ownership first
 		var dummyUUID uuid.UUID
-		err := tx.QueryRow(ctx, `SELECT id FROM projects WHERE id = $1 AND owner_id = $2`, projectID, userID).Scan(&dummyUUID)
+		err := tx.QueryRow(ctx, `SELECT id FROM projects WHERE id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR owner_id = $2)`, projectID, userID).Scan(&dummyUUID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrProjectNotFound
@@ -184,7 +184,7 @@ func (r *ProjectRepo) Update(ctx context.Context, projectID, userID uuid.UUID, u
 		args = append(args, projectID, userID)
 
 		query := `UPDATE projects SET ` + joinStrings(setParts, ", ") + `
-			WHERE id = $` + string(rune('0'+argIndex)) + ` AND owner_id = $` + string(rune('0'+argIndex+1)) + `
+			WHERE id = $` + string(rune('0'+argIndex)) + ` AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $` + string(rune('0'+argIndex+1)) + ` AND u.role = 'admin') OR owner_id = $` + string(rune('0'+argIndex+1)) + `)
 			RETURNING id, owner_id, project_code, project_name, client_name, contractor_name,
 				location, province, district, village, latitude, longitude, description,
 				start_date, end_date, status, created_at, updated_at, archived_at`
@@ -209,7 +209,7 @@ func (r *ProjectRepo) Update(ctx context.Context, projectID, userID uuid.UUID, u
 
 func (r *ProjectRepo) Delete(ctx context.Context, projectID, userID uuid.UUID) error {
 	return r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
-		result, err := tx.Exec(ctx, `DELETE FROM projects WHERE id = $1 AND owner_id = $2`, projectID, userID)
+		result, err := tx.Exec(ctx, `DELETE FROM projects WHERE id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR owner_id = $2)`, projectID, userID)
 		if err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (r *ProjectRepo) Delete(ctx context.Context, projectID, userID uuid.UUID) e
 
 func (r *ProjectRepo) Archive(ctx context.Context, projectID, userID uuid.UUID) error {
 	return r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
-		result, err := tx.Exec(ctx, `UPDATE projects SET status = 'archived', archived_at = now(), updated_at = now() WHERE id = $1 AND owner_id = $2`, projectID, userID)
+		result, err := tx.Exec(ctx, `UPDATE projects SET status = 'archived', archived_at = now(), updated_at = now() WHERE id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR owner_id = $2)`, projectID, userID)
 		if err != nil {
 			return err
 		}
@@ -235,7 +235,7 @@ func (r *ProjectRepo) Archive(ctx context.Context, projectID, userID uuid.UUID) 
 
 func (r *ProjectRepo) Restore(ctx context.Context, projectID, userID uuid.UUID) error {
 	return r.db.WithUserTx(ctx, userID, func(ctx context.Context, tx database.Tx) error {
-		result, err := tx.Exec(ctx, `UPDATE projects SET status = 'planning', archived_at = NULL, updated_at = now() WHERE id = $1 AND owner_id = $2`, projectID, userID)
+		result, err := tx.Exec(ctx, `UPDATE projects SET status = 'planning', archived_at = NULL, updated_at = now() WHERE id = $1 AND (EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.role = 'admin') OR owner_id = $2)`, projectID, userID)
 		if err != nil {
 			return err
 		}
