@@ -207,10 +207,11 @@ go test ./internal/auth/... -count=1
 
 ## Git Status
 
-- **Files Changed**: None (password update was database-only via tool)
-- **Commit**: Pending — will include this report and any relevant documentation updates
+- **Files Changed**: `INVALID_CREDENTIALS_INVESTIGATION_REPORT.md` (new)
+- **Commit**: `2e25ce7` — "docs: add invalid credentials investigation report"
+- **Push**: ✅ Pushed to `origin/main`
 - **No secrets or sensitive files committed**
 
 ---
 
-*Report updated with fix results. Ready for commit.*
+*Report updated with fix results. Commit and push complete.*
