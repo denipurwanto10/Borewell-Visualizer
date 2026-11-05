@@ -353,6 +353,3 @@ tar -czf files_backup_$(date +%Y%m%d_%H%M%S).tar.gz ./data/files
 - Multi-language support
 - Advanced charting (drill-down, annotations)
 
----
-
-*Built for the Indonesian borehole engineering community.*
