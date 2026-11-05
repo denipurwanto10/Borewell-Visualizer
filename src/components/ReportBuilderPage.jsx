@@ -293,7 +293,7 @@ export default function ReportBuilderPage({ notify }) {
   if (!activeWellId) {
     return (
       <div className="report-builder-page">
-        <PageHead kicker="07 · Laporan" title="Pembuat Laporan" description="Buat laporan penyelesaian sumur bor profesional.">
+        <PageHead kicker="Pekerjaan sumur" title="Laporan PDF" description="Buat laporan penyelesaian sumur bor profesional.">
           <Button variant="primary" icon={Download} disabled>Unduh PDF</Button>
         </PageHead>
         <div className="empty-state">
@@ -327,7 +327,7 @@ export default function ReportBuilderPage({ notify }) {
 
   return (
     <div className="report-builder-page">
-      <PageHead kicker={`Sumur: ${well?.wellCode}`} title="Pembuat Laporan Penyelesaian" description="Konfigurasikan bagian laporan, pilih foto, dan atur identitas sebelum mengekspor PDF.">
+      <PageHead kicker={`Sumur: ${well?.wellCode}`} title="Laporan PDF" description="Konfigurasikan bagian laporan, pilih foto, dan atur identitas sebelum mengekspor PDF.">
         <div className="head-actions">
           <Button variant="ghost" icon={Eye} onClick={handlePreview} disabled={generating}>Pratinjau</Button>
           <Button variant="primary" icon={Download} loading={generating} onClick={handleGeneratePdf} disabled={generating}>

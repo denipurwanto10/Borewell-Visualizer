@@ -1,0 +1,64 @@
+/* ==========================================================================
+   datepicker.css — kalender tanggal (popover desktop / bottom sheet HP).
+   Dirender lewat portal ke <body>, jadi tidak terpotong modal/dialog.
+   Ringan: hanya ada di DOM saat dibuka, tanpa blur & tanpa transisi per sel.
+   ========================================================================== */
+.dp-layer { position: fixed; inset: 0; z-index: 900; pointer-events: none; }
+.dp-pop {
+  position: fixed; pointer-events: auto; box-sizing: border-box; padding: 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-3); transform-origin: top left;
+  animation: dp-pop .16s var(--rf-spring, ease-out) both;
+}
+.dp-pop.is-up { transform-origin: bottom left; }
+.dp-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 10px; }
+.dp-head strong { font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; }
+.dp-head span { display: inline-flex; gap: 2px; }
+.dp-nav {
+  width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink-2); cursor: pointer; touch-action: manipulation;
+}
+.dp-nav:hover { background: var(--paper-2); }
+.dp-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.dp-dow { font-style: normal; text-align: center; padding: 4px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--mute); }
+.dp-day {
+  aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 500;
+  font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation;
+}
+.dp-day:hover { background: var(--paper-2); }
+.dp-day.is-out { color: var(--mute-2); }
+.dp-day.is-today { box-shadow: inset 0 0 0 1.5px var(--teal-ring); color: var(--teal-2); font-weight: 650; }
+.dp-day.is-selected { background: var(--teal); color: #fff; box-shadow: none; font-weight: 650; }
+.dp-foot { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.dp-foot button { border: 0; background: none; padding: 6px 8px; border-radius: 8px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--teal); cursor: pointer; }
+.dp-foot button:hover { background: var(--teal-soft); }
+.dp-foot button:only-child { margin-left: auto; }
+.dp-nav:focus-visible, .dp-day:focus-visible, .dp-foot button:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.dp-grab { display: none; }
+
+/* ---------- Bottom sheet (HP) ---------- */
+.dp-backdrop { position: fixed; inset: 0; pointer-events: auto; background: rgba(15, 24, 22, .45); animation: dp-fade .18s ease-out both; }
+.dp-layer.is-sheet .dp-pop {
+  left: 0; right: 0; top: auto; bottom: 0; width: 100%; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-width: 1px 0 0; border-radius: 22px 22px 0 0; transform-origin: bottom center;
+  animation: dp-sheet .26s cubic-bezier(.32, .72, 0, 1) both;
+}
+.dp-layer.is-sheet .dp-grab { display: block; width: 40px; height: 4px; margin: 0 auto 10px; border-radius: 4px; background: var(--line-2); }
+.dp-layer.is-sheet .dp-head { padding-bottom: 12px; }
+.dp-layer.is-sheet .dp-head strong { font-size: 18px; }
+.dp-layer.is-sheet .dp-nav { width: 44px; height: 44px; }
+.dp-layer.is-sheet .dp-grid { gap: 4px; }
+.dp-layer.is-sheet .dp-dow { font-size: 12px; }
+.dp-layer.is-sheet .dp-day { min-height: 42px; max-height: 52px; font-size: 16px; border-radius: 12px; }
+.dp-layer.is-sheet .dp-foot { margin-top: 12px; padding-top: 12px; }
+.dp-layer.is-sheet .dp-foot button { min-height: 44px; padding: 0 16px; font-size: 15px; }
+
+@keyframes dp-pop { from { opacity: 0; transform: translate3d(0, -4px, 0) scale(.98); } to { opacity: 1; transform: none; } }
+.dp-pop.is-up { animation-name: dp-pop-up; }
+@keyframes dp-pop-up { from { opacity: 0; transform: translate3d(0, 4px, 0) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes dp-sheet { from { transform: translate3d(0, 100%, 0); } to { transform: none; } }
+@keyframes dp-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dp-pop, .dp-backdrop { animation: none !important; } }
+@media print { .dp-layer { display: none; } }

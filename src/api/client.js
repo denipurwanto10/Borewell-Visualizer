@@ -28,26 +28,74 @@ function errorFromResponse(res, body) {
   return err;
 }
 
-let refreshInFlight = null;
-let refreshResolveList = [];
-
-async function waitForRefresh() {
-  return new Promise((resolve) => {
-    refreshResolveList.push(resolve);
-  });
+// Shared access-token storage (memory only, never persisted).
+export function getAccessToken() {
+  if (typeof window === 'undefined') return null;
+  return window.__borewell_access_token || null;
 }
 
-function resolveRefreshWaiters(success) {
-  const list = refreshResolveList;
-  refreshResolveList = [];
-  for (const resolve of list) {
-    resolve(success);
-  }
+export function setAccessToken(token) {
+  if (typeof window === 'undefined') return;
+  window.__borewell_access_token = token || null;
 }
+
+export function clearAccessToken() {
+  if (typeof window === 'undefined') return;
+  window.__borewell_access_token = null;
+}
+
+// Single-flight refresh: one in-flight promise shared by all callers.
+let refreshPromise = null;
+
+export function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!refreshRes.ok) {
+        clearAccessToken();
+        const err = new Error(refreshRes.status === 401 || refreshRes.status === 403
+          ? 'Session expired'
+          : `Refresh failed (${refreshRes.status})`);
+        err.status = refreshRes.status;
+        throw err;
+      }
+      const data = await refreshRes.json();
+      setAccessToken(data.access_token);
+      return data.access_token;
+    } catch (err) {
+      if (!err || !err.status) {
+        clearAccessToken();
+      }
+      if (!err.status) {
+        const e = new Error('Network error');
+        e.status = 0;
+        throw e;
+      }
+      throw err;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+// Back-compat aliases used by older callers.
+export const refreshInFlightPromise = () => refreshPromise;
 
 // Fetch with auth + automatic refresh on 401
 export async function apiRequest(path, options = {}) {
-  const token = window.__borewell_access_token || null;
+  // Wait for any in-flight refresh before sending, so we don't use a stale token.
+  const isRefreshPath = path === '/auth/refresh';
+  const isAuthEntryPath = path === '/auth/login' || path === '/auth/register';
+  if (!isRefreshPath && !isAuthEntryPath && refreshPromise) {
+    try { await refreshPromise; } catch { /* ignore */ }
+  }
+
+  const token = getAccessToken();
 
   const headers = {
     ...(options.headers || {}),
@@ -70,45 +118,35 @@ export async function apiRequest(path, options = {}) {
     return res;
   }
 
-  // 401 -> attempt refresh once
-  if (res.status === 401 && !options._retried) {
-    if (!refreshInFlight) {
-      refreshInFlight = (async () => {
-        try {
-          const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-            method: 'POST',
-            credentials: 'include',
-          });
-          if (refreshRes.ok) {
-            const data = await refreshRes.json();
-            window.__borewell_access_token = data.access_token;
-            resolveRefreshWaiters(true);
-          } else {
-            window.__borewell_access_token = null;
-            resolveRefreshWaiters(false);
-          }
-        } catch {
-          window.__borewell_access_token = null;
-          resolveRefreshWaiters(false);
-        } finally {
-          refreshInFlight = null;
-        }
-      })();
+  // 401 -> attempt refresh once (but never for refresh/login/register endpoints)
+  const allowRefresh = res.status === 401 && !options._retried && !isRefreshPath && !isAuthEntryPath;
+  if (allowRefresh) {
+    try {
+      await refreshAccessToken();
+    } catch {
+      // refresh failed; fall through to throw original error
     }
 
-    await waitForRefresh();
-
-    if (window.__borewell_access_token) {
-      // Retry the original request with new token
+    const newToken = getAccessToken();
+    if (newToken) {
+      // Retry the original request with new token exactly once
       const retryOpts = { ...options, _retried: true };
-      if (retryOpts.headers) {
-        retryOpts.headers.Authorization = `Bearer ${window.__borewell_access_token}`;
-      }
+      const retryHeaders = { ...(retryOpts.headers || {}) };
+      retryHeaders.Authorization = `Bearer ${newToken}`;
+      retryOpts.headers = retryHeaders;
       return apiRequest(path, retryOpts);
     }
 
     // Refresh failed - auth state is invalid
     throw errorFromResponse(res, await parseBody(res).catch(() => null));
+  }
+
+  // For refresh/login/register or non-401 errors, throw normally.
+  if (res.status === 401 && isRefreshPath) {
+    // Do not recursively refresh; propagate 401.
+    const err = errorFromResponse(res, await parseBody(res).catch(() => null));
+    err.status = 401;
+    throw err;
   }
 
   const body = await parseBody(res);

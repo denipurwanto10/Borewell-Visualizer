@@ -518,8 +518,8 @@ export default function DataManagementPage() {
   return (
     <div className="data-management-page">
       <PageHead
-        kicker="08 · Manajemen Data"
-        title="Backup, Restore & Integritas Data"
+        kicker="Pengelolaan"
+        title="Backup & Data"
         description="Kelola backup, impor/ekspor, kesehatan penyimpanan, dan integritas data aplikasi."
       >
         <Tabs value={activeTab} onChange={setActiveTab} className="page-tabs">

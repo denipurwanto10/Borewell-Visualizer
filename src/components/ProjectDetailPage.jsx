@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Plus, Filter, ChevronDown, MoreHorizontal, Edit, Trash2, Copy, RotateCcw, ExternalLink, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button, Field, PageHead, useConfirm, ActionMenu } from '../components/Primitives';
 import { useProject } from '../context/ProjectContext';
+import { wellAPI } from '../api/client';
 import { getWellData } from '../storage/projectStorage';
 
 const STATUS_STYLES = {
@@ -33,7 +34,7 @@ function WellRow({ well, onEdit, onDelete, onDuplicate, onOpen, confirm }) {
   const style = STATUS_STYLES[well.status] || STATUS_STYLES.planned;
 
   return (
-    <tr>
+    <tr onClick={() => onOpen(well.id)}>
       <td className="col-main">
         <div className="well-name-wrap">
           <strong>{well.wellName}</strong>
@@ -48,7 +49,7 @@ function WellRow({ well, onEdit, onDelete, onDuplicate, onOpen, confirm }) {
       <td className="mono" data-label="Aktual (m)">{well.actualDepth || '-'}</td>
       <td className="mono coords" data-label="Koordinat">{well.latitude && well.longitude ? `${Number(well.latitude).toFixed(4)}, ${Number(well.longitude).toFixed(4)}` : '-'}</td>
       <td className="mono" data-label="Tgl. bor">{well.drillingDate ? new Date(well.drillingDate).toLocaleDateString('id-ID') : '-'}</td>
-      <td className="col-actions">
+      <td className="col-actions" onClick={(e) => e.stopPropagation()}>
         <ActionMenu icon={MoreHorizontal}>
             <button onClick={() => onOpen(well.id)}><ExternalLink size={16} /><span>Buka sumur</span></button>
             <button onClick={() => onEdit(well)}><Edit size={16} /><span>Edit</span></button>
@@ -91,7 +92,7 @@ function WellForm({ well, onSubmit, onCancel, loading, wellTypes, onChange }) {
 }
 
 export default function ProjectDetailPage({ projectId }) {
-  const { projects, activeProjectId, activeWellId, selectProject, selectWell, createWell, updateWell, deleteWell, duplicateWell, getWellsForProject, notify, WELL_TYPES, WELL_STATUSES } = useProject();
+  const { projects, activeProjectId, activeWellId, selectProject, selectWell, createWell, updateWell, deleteWell, duplicateWell, getWellsForProject, isAuthenticated, notify, WELL_TYPES, WELL_STATUSES } = useProject();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -104,10 +105,45 @@ export default function ProjectDetailPage({ projectId }) {
   const [formData, setFormData] = useState({});
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [wells, setWells] = useState([]);
   const [confirm, confirmDialog] = useConfirm();
 
   const project = projects.find(p => p.id === projectId);
-  const wells = useMemo(() => getWellsForProject(projectId), [projectId]);
+
+  const loadWells = useCallback(async () => {
+    if (!projectId) return;
+    if (isAuthenticated) {
+      try {
+        const res = await wellAPI.list(projectId, { page_size: 100 });
+        const list = (res?.data || []).map((w) => ({
+          id: w.id,
+          projectId: w.project_id,
+          wellCode: w.well_code,
+          wellName: w.well_name,
+          wellType: w.well_type,
+          location: w.location,
+          latitude: w.latitude,
+          longitude: w.longitude,
+          plannedDepth: w.planned_depth,
+          actualDepth: w.actual_depth,
+          drillingDate: w.drilling_date,
+          completionDate: w.completion_date,
+          status: w.status,
+          description: w.description,
+          updatedAt: w.updated_at,
+        }));
+        setWells(list);
+      } catch {
+        setWells([]);
+      }
+    } else {
+      setWells(getWellsForProject(projectId));
+    }
+  }, [projectId, isAuthenticated, getWellsForProject]);
+
+  useEffect(() => {
+    loadWells();
+  }, [loadWells]);
 
   const filteredWells = useMemo(() => {
     let result = [...wells];
@@ -166,35 +202,37 @@ export default function ProjectDetailPage({ projectId }) {
     e.preventDefault();
     setSaving(true);
     if (editingWell) {
-      const res = updateWell(editingWell.id, formData);
-      if (res.success) closeForm();
+      const res = await updateWell(editingWell.id, formData);
+      if (res.success) { closeForm(); loadWells(); }
       else setFormErrors(res.errors);
     } else {
-      const res = createWell({ ...formData, projectId });
-      if (res.success) closeForm();
+      const res = await createWell({ ...formData, projectId });
+      if (res.success) { closeForm(); loadWells(); }
       else setFormErrors(res.errors);
     }
     setSaving(false);
   };
 
   const handleDelete = async (id) => {
-    await deleteWell(id, confirm);
+    const r = await deleteWell(id, confirm);
+    if (r?.success) loadWells();
   };
 
-  const handleDuplicate = (id) => {
-    duplicateWell(id);
+  const handleDuplicate = async (id) => {
+    await duplicateWell(id);
+    loadWells();
   };
 
   const handleOpen = (wellId) => {
     selectWell(wellId);
-    window.location.hash = '#/visualisasi';
+    window.location.hash = '/visualisasi';
   };
 
   if (!project) {
     return (
       <div className="project-detail-page">
         <PageHead kicker="Proyek" title="Proyek tidak ditemukan" description="Proyek yang dicari tidak ada atau telah dihapus.">
-          <Button variant="ghost" icon={ArrowLeft} onClick={() => window.history.back()}>Kembali</Button>
+          <Button variant="ghost" icon={ArrowLeft} onClick={() => { window.location.hash = '#projects'; }}>Kembali</Button>
         </PageHead>
         {confirmDialog}
       </div>
@@ -205,7 +243,7 @@ export default function ProjectDetailPage({ projectId }) {
     <div className="project-detail-page">
       <PageHead kicker={`Proyek: ${project.projectCode}`} title={project.projectName} description={project.description || project.location}>
         <div className="head-actions">
-          <Button variant="ghost" icon={ArrowLeft} onClick={() => window.history.back()}>Kembali</Button>
+          <Button variant="ghost" icon={ArrowLeft} onClick={() => { window.location.hash = '#projects'; }}>Kembali</Button>
           <Button variant="primary" icon={Plus} onClick={openCreateForm}>Tambah Sumur</Button>
         </div>
       </PageHead>
@@ -258,6 +296,7 @@ export default function ProjectDetailPage({ projectId }) {
               <th onClick={() => handleSort('status')}>Status</th>
               <th onClick={() => handleSort('plannedDepth')}>Rencana (m)</th>
               <th onClick={() => handleSort('actualDepth')}>Aktual (m)</th>
+              <th className="th-coords">Koordinat</th>
               <th onClick={() => handleSort('drillingDate')}>Tgl. Bor</th>
               <th>Aksi</th>
             </tr>
@@ -275,7 +314,7 @@ export default function ProjectDetailPage({ projectId }) {
               />
             ))}
             {paginatedWells.length === 0 && (
-              <tr><td colSpan={6} className="empty-row">Tidak ada sumur yang cocok</td></tr>
+              <tr><td colSpan={7} className="empty-row">Tidak ada sumur yang cocok</td></tr>
             )}
           </tbody>
         </table>
@@ -296,7 +335,7 @@ export default function ProjectDetailPage({ projectId }) {
           <div className="dialog-scrim" onClick={closeForm} />
           <div className="dialog dialog-wide" role="dialog" aria-modal="true" aria-labelledby="form-title">
             <h3 id="form-title">{editingWell ? 'Edit Sumur' : 'Tambah Sumur Baru'}</h3>
-            <WellForm well={formData} onSubmit={handleFormChange} onCancel={closeForm} loading={saving} wellTypes={WELL_TYPES} onChange={handleFormChange} />
+            <WellForm well={formData} onSubmit={handleSubmit} onCancel={closeForm} loading={saving} wellTypes={WELL_TYPES} onChange={handleFormChange} />
           </div>
         </div>
       )}

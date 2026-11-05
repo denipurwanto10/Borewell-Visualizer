@@ -97,8 +97,8 @@ export default function DataPage({ well, setWell, notify, onSave, onReset }) {
   return (
     <div className="data">
       <PageHead
-        kicker="02 · Data sumur"
-        title="Data sumur bor"
+        kicker="Pekerjaan sumur"
+        title="Data Sumur"
         description="Informasi perusahaan, lokasi, dan teknis sumur untuk dicantumkan pada laporan."
       />
 

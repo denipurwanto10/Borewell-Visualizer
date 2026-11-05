@@ -84,10 +84,9 @@ export default function RegisterPage() {
   const mismatch = !!confirmPassword && password !== confirmPassword;
 
   return (
-    <div className="auth-page">
+    <div className="auth-page is-register">
       <div className="auth-card">
         <div className="auth-header">
-          <span className="auth-eyebrow">Akun baru</span>
           <h1>Daftar</h1>
           <p>Buat akun baru untuk Borewell Engineering Visualizer.</p>
         </div>
@@ -134,7 +133,7 @@ export default function RegisterPage() {
               label="Password"
               icon={Lock}
               type="password"
-              placeholder="Minimal 12 karakter"
+              placeholder="Buat password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"

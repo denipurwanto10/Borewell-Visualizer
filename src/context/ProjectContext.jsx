@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   initializeStorage,
   getAllProjects as lsGetAllProjects,
@@ -25,6 +25,7 @@ import {
 import { validateProject, validateWell, PROJECT_STATUSES, WELL_TYPES, WELL_STATUSES } from '../models/project';
 import { INITIAL_WELL, EMPTY_MODEL, makeEmptyActivity } from '../model';
 import { useAuth } from './AuthContext';
+import { isValidBackendId } from '../utils/ids';
 import {
   getWellDocumentation,
   getProjectDocumentation,
@@ -47,6 +48,9 @@ import {
   backupAPI,
 } from '../api/client';
 
+// Request deduplication cache for loadActiveWellData
+export const loadWellDataCache = new Map();
+
 const ProjectContext = createContext(null);
 
 export function ProjectProvider({ children }) {
@@ -55,6 +59,7 @@ export function ProjectProvider({ children }) {
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectIdState] = useState(null);
   const [activeWellId, setActiveWellIdState] = useState(null);
+  const [activeWellData, setActiveWellDataState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [migrationResult, setMigrationResult] = useState(null);
   const [toast, setToast] = useState(null);
@@ -65,18 +70,22 @@ export function ProjectProvider({ children }) {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  // Initialize: run localStorage migration (existing behavior) then load from API if authenticated
+  // Initialize storage once.
   useEffect(() => {
     const result = initializeStorage();
     setMigrationResult(result);
+  }, []);
 
+  // Load data only after auth initialization completes.
+  useEffect(() => {
+    if (authLoading) return;
     if (isAuthenticated) {
       loadProjectsFromAPI();
     } else {
       refreshProjectsFromLS();
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
   // --- LocalStorage mode helpers ---
 
@@ -124,8 +133,12 @@ export function ProjectProvider({ children }) {
       } else if (normalized.length > 0) {
         setActiveProjectIdState(normalized[0].id);
       }
-      const lsActiveWell = lsGetActiveWellId();
-      setActiveWellIdState(lsActiveWell);
+      // In authenticated mode the active well is selected in-memory only.
+      // Never carry over a stale/generated localStorage well id (e.g. from
+      // offline mode or legacy migration) because it is not a backend UUID and
+      // would produce HTTP 400 responses. Reset to null and clear stale UI state.
+      lsSetActiveWellId(null);
+      setActiveWellIdState(null);
     } catch (err) {
       console.error('Failed to load projects from API:', err);
       // Fallback to localStorage
@@ -141,11 +154,12 @@ export function ProjectProvider({ children }) {
   const activeWell = useMemo(() => {
     if (!activeWellId) return null;
     if (isAuthenticated) {
-      // API mode: well data is fetched on demand via wellAPI.get
-      return null; // will be loaded lazily
+      // Use cached well data from loadActiveWellData
+      if (activeWellData) return { well: activeWellData.well, model: activeWellData.model, activity: activeWellData.activity };
+      return null; // not loaded yet
     }
     return lsGetWellData(activeWellId);
-  }, [activeWellId, isAuthenticated]);
+  }, [activeWellId, isAuthenticated, activeWellData]);
 
   // --- Project CRUD ---
 
@@ -371,13 +385,19 @@ export function ProjectProvider({ children }) {
   // --- Well CRUD ---
 
   const selectProject = useCallback((id) => {
+    // Clear cached load promises when switching projects
+    loadWellDataCache.clear();
     setActiveProjectIdState(id);
     setActiveWellIdState(null);
+    setActiveWellDataState(null);
     notify('Proyek aktif diubah', 'info');
   }, [notify]);
 
   const selectWell = useCallback((wellId) => {
+    // Clear any cached load promise for the previous well to prevent stale responses
+    loadWellDataCache.clear();
     setActiveWellIdState(wellId);
+    setActiveWellDataState(null);
     notify('Sumur aktif diubah', 'info');
   }, [notify]);
 
@@ -528,6 +548,7 @@ export function ProjectProvider({ children }) {
   }, [isAuthenticated]);
 
   const getWellData = useCallback(async (wellId) => {
+    if (isAuthenticated && !isValidBackendId(wellId)) return null;
     if (isAuthenticated) {
       try {
         const res = await wellAPI.get(wellId);
@@ -537,12 +558,17 @@ export function ProjectProvider({ children }) {
       }
     }
     return lsGetWellData(wellId);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isValidBackendId]);
 
   // --- Module data (Designer, Geology, Monitoring) ---
 
   const saveActiveWellData = useCallback(async ({ well, model, activity }) => {
     if (!activeWellId) return { success: false };
+    if (isAuthenticated && !isValidBackendId(activeWellId)) {
+      // Prevent requests with generated/offline ids.
+      setActiveWellIdState(null);
+      return { success: false };
+    }
 
     if (isAuthenticated) {
       try {
@@ -565,27 +591,36 @@ export function ProjectProvider({ children }) {
 
         // Save designer state
         if (model && model.designer) {
-          await designerAPI.upsert(activeWellId, {
+          const designerRes = await designerAPI.upsert(activeWellId, {
             version: model.designer.version || 1,
             components: model.designer.components || [],
             config: model.designer.config || {},
           });
+          if (designerRes?.data?.version) {
+            model.designer.version = designerRes.data.version;
+          }
         }
 
         // Save geology log
         if (model && model.geologicalLog) {
-          await geologyAPI.upsert(activeWellId, {
+          const geologyRes = await geologyAPI.upsert(activeWellId, {
             version: model.geologicalLog.version || 1,
             layers: model.geologicalLog.layers || [],
           });
+          if (geologyRes?.data?.version) {
+            model.geologicalLog.version = geologyRes.data.version;
+          }
         }
 
         // Save monitoring data
         if (model && model.groundwaterMonitoring) {
-          await monitoringAPI.upsert(activeWellId, {
+          const monitoringRes = await monitoringAPI.upsert(activeWellId, {
             version: model.groundwaterMonitoring.version || 1,
             measurements: model.groundwaterMonitoring.measurements || [],
           });
+          if (monitoringRes?.data?.version) {
+            model.groundwaterMonitoring.version = monitoringRes.data.version;
+          }
         }
 
         notify('Data berhasil disimpan', 'success');
@@ -602,61 +637,100 @@ export function ProjectProvider({ children }) {
     }
   }, [activeWellId, isAuthenticated, refreshProjectsFromLS, notify]);
 
-  const loadActiveWellData = useCallback(async () => {
+  const loadActiveWellData = useCallback(async (options = {}) => {
+    const { forceRefresh = false } = options;
     if (!activeWellId) return null;
-    if (isAuthenticated) {
-      try {
-        const wellRes = await wellAPI.get(activeWellId);
-        const designerRes = await designerAPI.get(activeWellId).catch(() => ({ data: { version: 1, components: [], config: {} } }));
-        const geologyRes = await geologyAPI.get(activeWellId).catch(() => ({ data: { version: 1, layers: [] } }));
-        const monitoringRes = await monitoringAPI.get(activeWellId).catch(() => ({ data: { version: 1, measurements: [] } }));
+    if (isAuthenticated && !isValidBackendId(activeWellId)) {
+      setActiveWellIdState(null);
+      return null;
+    }
 
-        // Normalize API well data (snake_case) to frontend camelCase
-        const w = wellRes.data || {};
-        const normalizedWell = {
-          id: w.id,
-          wellCode: w.well_code,
-          wellName: w.well_name,
-          wellType: w.well_type,
-          location: w.location || '',
-          latitude: w.latitude || '',
-          longitude: w.longitude || '',
-          plannedDepth: w.planned_depth != null ? String(w.planned_depth) : '',
-          actualDepth: w.actual_depth != null ? String(w.actual_depth) : '',
-          drillingDate: w.drilling_date || '',
-          completionDate: w.completion_date || '',
-          status: w.status || 'planned',
-          description: w.description || '',
-          projectId: w.project_id,
-          createdAt: w.created_at,
-          updatedAt: w.updated_at,
-          boreholeImages: w.borehole_images || {},
-        };
+    const cacheKey = `${isAuthenticated ? 'api' : 'ls'}:${activeWellId}`;
 
-        return {
-          well: normalizedWell,
-          model: {
-            designer: designerRes.data || { version: 1, components: [], config: {} },
-            geologicalLog: geologyRes.data || { version: 1, layers: [] },
-            groundwaterMonitoring: monitoringRes.data || { version: 1, measurements: [] },
-            pipes: [],
-            screens: [],
-            ground: null,
-            mat: null,
-          },
-          activity: makeEmptyActivity(),
-        };
-      } catch (err) {
-        console.error('Failed to load well data from API:', err);
-        return null;
+    // If force refresh, clear the cache entry for this well
+    if (forceRefresh) {
+      loadWellDataCache.delete(cacheKey);
+    }
+
+    // Return in-flight promise if one exists (and not forcing refresh)
+    if (!forceRefresh && loadWellDataCache.has(cacheKey)) {
+      return loadWellDataCache.get(cacheKey);
+    }
+
+    // Create new load promise
+    const loadPromise = (async () => {
+      if (isAuthenticated) {
+        try {
+          const wellRes = await wellAPI.get(activeWellId);
+          const designerRes = await designerAPI.get(activeWellId).catch(() => ({ data: { version: 1, components: [], config: {} } }));
+          const geologyRes = await geologyAPI.get(activeWellId).catch(() => ({ data: { version: 1, layers: [] } }));
+          const monitoringRes = await monitoringAPI.get(activeWellId).catch(() => ({ data: { version: 1, measurements: [] } }));
+
+          // Normalize API well data (snake_case) to frontend camelCase
+          const w = wellRes.data || {};
+          const normalizedWell = {
+            id: w.id,
+            wellCode: w.well_code,
+            wellName: w.well_name,
+            wellType: w.well_type,
+            location: w.location || '',
+            latitude: w.latitude || '',
+            longitude: w.longitude || '',
+            plannedDepth: w.planned_depth != null ? String(w.planned_depth) : '',
+            actualDepth: w.actual_depth != null ? String(w.actual_depth) : '',
+            drillingDate: w.drilling_date || '',
+            completionDate: w.completion_date || '',
+            status: w.status || 'planned',
+            description: w.description || '',
+            projectId: w.project_id,
+            createdAt: w.created_at,
+            updatedAt: w.updated_at,
+            boreholeImages: w.borehole_images || {},
+          };
+
+          const wellData = {
+            well: normalizedWell,
+            model: {
+              designer: designerRes.data || { version: 1, components: [], config: {} },
+              geologicalLog: geologyRes.data || { version: 1, layers: [] },
+              groundwaterMonitoring: monitoringRes.data || { version: 1, measurements: [] },
+              pipes: [],
+              screens: [],
+              ground: null,
+              mat: null,
+            },
+            activity: makeEmptyActivity(),
+          };
+          // Only update state if this well is still the active one (prevent stale overwrites)
+          setActiveWellDataState(wellData);
+          return wellData;
+        } catch (err) {
+          console.error('Failed to load well data from API:', err);
+          throw err;
+        }
+      }
+      return lsGetWellData(activeWellId);
+    })();
+
+    // Cache the promise
+    loadWellDataCache.set(cacheKey, loadPromise);
+
+    try {
+      const result = await loadPromise;
+      return result;
+    } finally {
+      // Clean up cache after completion (success or failure)
+      // Only delete if it's still our promise (not replaced by a new one)
+      if (loadWellDataCache.get(cacheKey) === loadPromise) {
+        loadWellDataCache.delete(cacheKey);
       }
     }
-    return lsGetWellData(activeWellId);
   }, [activeWellId, isAuthenticated]);
 
   // --- Documentation: Photos & Documents (dual-write: API when authenticated, localStorage fallback) ---
 
   const getPhotos = useCallback(async (contextType, contextId) => {
+    if (isAuthenticated && !isValidBackendId(contextId)) return [];
     if (isAuthenticated) {
       try {
         const res = await photoAPI.list(contextType, contextId, { page_size: 100 });
@@ -686,9 +760,12 @@ export function ProjectProvider({ children }) {
       ? getWellDocumentation(contextId)
       : getProjectDocumentation(contextId);
     return docs.photos || [];
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isValidBackendId]);
 
   const uploadPhoto = useCallback(async (contextType, contextId, file, metadata) => {
+    if (isAuthenticated && !isValidBackendId(contextId)) {
+      throw new Error('ID konteks tidak valid');
+    }
     if (isAuthenticated) {
       try {
         const formData = new FormData();
@@ -726,9 +803,10 @@ export function ProjectProvider({ children }) {
       fileType: file.type,
       fileSize: file.size,
     });
-  }, [isAuthenticated, activeProjectId]);
+  }, [isAuthenticated, activeProjectId, isValidBackendId]);
 
   const getDocuments = useCallback(async (contextType, contextId) => {
+    if (isAuthenticated && !isValidBackendId(contextId)) return [];
     if (isAuthenticated) {
       try {
         const res = await documentAPI.list(contextType, contextId, { page_size: 100 });
@@ -756,9 +834,12 @@ export function ProjectProvider({ children }) {
       ? getWellDocumentation(contextId)
       : getProjectDocumentation(contextId);
     return docs.documents || [];
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isValidBackendId]);
 
   const uploadDocument = useCallback(async (contextType, contextId, file, metadata) => {
+    if (isAuthenticated && !isValidBackendId(contextId)) {
+      throw new Error('ID konteks tidak valid');
+    }
     if (isAuthenticated) {
       try {
         const formData = new FormData();
@@ -796,7 +877,7 @@ export function ProjectProvider({ children }) {
       fileType: file.type,
       fileSize: file.size,
     });
-  }, [isAuthenticated, activeProjectId]);
+  }, [isAuthenticated, activeProjectId, isValidBackendId]);
 
   const deletePhotoAPI = useCallback(async (photoId) => {
     if (isAuthenticated) {

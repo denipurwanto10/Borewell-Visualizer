@@ -1,0 +1,141 @@
+/* ==========================================================================
+   mobile-polish.css — Penyempurnaan tampilan HP & tablet (dimuat PALING AKHIR)
+   Prinsip: satu kolom yang lega, target sentuh ≥ 44px, dialog menjadi lembar
+   dari bawah (mudah dijangkau jempol), tabel & tab bisa digeser dengan petunjuk
+   visual, aman untuk notch/home-indicator, dan tidak pernah melebar ke samping.
+   Hapus file ini + import-nya di main.jsx untuk kembali ke tampilan sebelumnya.
+   ========================================================================== */
+
+:root { --safe-t: env(safe-area-inset-top, 0px); --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px); }
+
+/* ---------- Dasar sentuh (semua perangkat sentuh) ---------- */
+button, a, [role='button'], select, input, label { touch-action: manipulation; }
+html { overflow-x: clip; }
+.main { overflow-x: clip; padding-left: max(var(--gutter), var(--safe-l)); padding-right: max(var(--gutter), var(--safe-r)); }
+h1, h2, h3, .panel-head h2, .brand-text strong { overflow-wrap: anywhere; text-wrap: balance; }
+p { text-wrap: pretty; }
+
+/* Tab: bisa digeser, dengan pudar di tepi sebagai petunjuk ada lanjutannya */
+.tab-list { overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+.tab-list::-webkit-scrollbar { display: none; }
+.tab { white-space: nowrap; flex: none; scroll-snap-align: start; }
+
+/* Tabel lebar: geser mendatar dengan bayangan tepi (muncul hanya bila ada lanjutan) */
+.table-wrap, .admin-table-wrap {
+  overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+  background:
+    linear-gradient(to right, var(--card) 30%, rgba(251, 250, 246, 0)) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--card) 30%, rgba(251, 250, 246, 0)) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(21, 32, 30, .14), transparent) left center / 10px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(21, 32, 30, .14), transparent) right center / 10px 100% no-repeat scroll;
+}
+
+/* ==========================================================================
+   TABLET (≤ 1099px)
+   ========================================================================== */
+@media (max-width: 1099px) {
+  .main { padding-top: 0; }
+  .page-head { flex-wrap: wrap; }
+  .page-head-aside { width: 100%; justify-content: flex-start; }
+}
+
+/* ==========================================================================
+   HP & TABLET KECIL (≤ 820px)
+   ========================================================================== */
+@media (max-width: 820px) {
+  :root { --gutter: 16px; }
+
+  /* Topbar: ringkas, judul tidak terpotong */
+  .topbar-inner { min-height: 56px; padding: 6px max(14px, var(--safe-l)) 6px max(14px, var(--safe-l)); }
+  .brand-text strong { font-size: 17px; }
+  .topbar-actions .btn { --h: 40px; }
+  .topbar-actions .btn .btn-label { font-size: 13px; }
+
+  /* Kepala halaman: bertumpuk, aksi utama selebar layar */
+  .page-head { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px 0 14px; margin-bottom: 14px; }
+  .page-head h1 { font-size: clamp(22px, 6.4vw, 26px); }
+  .page-head p { font-size: 14px; max-width: none; }
+  .page-head-aside, .head-actions { justify-content: flex-start; }
+  .page-head-aside .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* Kartu & panel: padding & jarak lebih rapat, mudah dipindai */
+  .panel { padding: 16px; border-radius: var(--r-lg); }
+  .panel-head { margin-bottom: 12px; }
+  .panel-head h2 { font-size: 15.5px; }
+  .stat { padding: 10px 12px; }
+  .stat-value b { font-size: 20px; }
+
+  /* Tombol & isian: target sentuh nyaman */
+  .btn { --h: 44px; min-height: 44px; }
+  .btn.icon-only { width: 44px; }
+  .field-input, select, textarea, input[type='text'], input[type='email'], input[type='password'],
+  input[type='number'], input[type='date'], input[type='search'], .form-input, .filter-select { font-size: 16px; min-height: 44px; }
+  textarea { min-height: 96px; }
+  .field-label { font-size: 13px; }
+  .prop-toggle, .view-toggle button, .tab { min-height: 44px; }
+
+  /* Daftar yang bisa diketuk: area sentuh penuh, tanpa efek hover */
+  .sidebar-btn, .drawer-btn, .more-item { -webkit-tap-highlight-color: transparent; }
+
+  /* ----- Dialog → lembar dari bawah ----- */
+  .dialog-layer { place-items: end center; padding: 0; }
+  .dialog, .dialog-wide {
+    width: 100%; max-width: none; max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: calc(20px + var(--safe-b));
+    transform: translateY(36px); opacity: 0;
+  }
+  .dialog-wide { padding-bottom: 0; }
+  .dialog-wide .form-dialog { padding: 18px 18px 0; }
+  .dialog-wide > h3 { padding: 18px 18px 12px; font-size: 18px; }
+  .dialog-wide .form-actions { position: sticky; bottom: 0; padding: 12px 18px calc(12px + var(--safe-b)); background: var(--card); border-top: 1px solid var(--line); }
+  .dialog-layer.is-open .dialog { transform: none; opacity: 1; }
+  .dialog::before {
+    content: ''; display: block; width: 38px; height: 4px; border-radius: 4px; background: var(--line-2);
+    margin: -8px auto 14px;
+  }
+  .dialog-wide::before { margin: 8px auto 0; }
+
+  /* Toast: di atas tab bar, selebar layar dengan margin */
+  .toast-wrap { padding-inline: 12px; }
+  .toast { max-width: 100%; width: 100%; }
+
+  /* Menu "⋯" & dropdown: lebar mengikuti layar */
+  .more-menu, .action-menu .dropdown { max-width: calc(100vw - 24px); }
+
+  /* Konten kanvas (visualisasi/desain/geologi): jangan melebihi layar */
+  .viz-stage, .designer-canvas-wrap, .geology-canvas-wrap, .report-preview { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* ==========================================================================
+   HP (≤ 560px)
+   ========================================================================== */
+@media (max-width: 560px) {
+  :root { --gutter: 14px; }
+  .main { padding-top: 0; }
+  .stats-grid { gap: 10px; }
+  .quick-actions-grid, .report-builder-grid, .report-metadata { grid-template-columns: minmax(0, 1fr); }
+  .panel, .card-section { padding: 14px; }
+  .empty-state { padding: 36px 16px !important; }
+  .empty-state h3 { font-size: 15.5px; }
+  .empty-state .btn { width: 100%; }
+}
+
+/* Layar sangat kecil */
+@media (max-width: 360px) {
+  .brand-text strong { font-size: 16px; }
+  .btn { padding-inline: 14px; }
+  .tabbar > button { font-size: 10px; }
+}
+
+/* HP landscape: rapatkan bar agar konten punya ruang */
+@media (max-width: 960px) and (max-height: 480px) {
+  .dialog, .dialog-wide { max-height: 100dvh; border-radius: 14px 14px 0 0; }
+  .topbar-inner { min-height: 48px; }
+  .page-head { padding: 8px 0; margin-bottom: 8px; }
+}
+
+/* Perangkat sentuh: tanpa hover yang menempel pada kartu */
+@media (hover: none) {
+  .panel:hover, .card:hover, .doc:hover, .tile:hover { transform: none; box-shadow: var(--shadow-1); }
+}

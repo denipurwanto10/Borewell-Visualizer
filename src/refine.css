@@ -1,0 +1,357 @@
+/* ==========================================================================
+   refine.css — penyempurnaan akhir: responsif + animasi halus.
+   Dimuat PALING AKHIR (setelah mobile-polish.css) sehingga menimpa semua
+   aturan sebelumnya tanpa mengubah file lama.
+   Hapus file ini + import-nya di main.jsx untuk kembali ke tampilan lama.
+   ========================================================================== */
+
+:root {
+  /* Kurva gerak: "spring" = cepat lalu mengendap lembut, tanpa memantul kasar */
+  --rf-spring: cubic-bezier(.16, 1, .3, 1);
+  --rf-smooth: cubic-bezier(.32, .72, 0, 1);
+  --rf-in-out: cubic-bezier(.45, 0, .2, 1);
+  --rf-fast: 200ms;
+  --rf-base: 380ms;
+  --rf-slow: 620ms;
+  --rf-lift: 0 1px 2px rgba(21, 32, 30, .05), 0 12px 28px -16px rgba(21, 32, 30, .28);
+  --rf-float: 0 2px 4px rgba(21, 32, 30, .06), 0 28px 60px -22px rgba(21, 32, 30, .45);
+}
+
+/* ==========================================================================
+   1. ANIMASI
+   ========================================================================== */
+@keyframes rf-fade   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rf-rise   { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+@keyframes rf-scrim  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rf-dialog {
+  0%   { opacity: 0; transform: translate3d(0, 22px, 0) scale(.965); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes rf-sheet  { from { transform: translate3d(0, 100%, 0); } to { transform: none; } }
+@keyframes rf-pop    { from { opacity: 0; transform: translate3d(0, -6px, 0) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes rf-item   { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: none; } }
+
+/* --- Pindah halaman: halaman memudar, lalu isinya naik berurutan --- */
+.page.is-active { animation: rf-fade var(--rf-base) var(--rf-in-out) both; }
+.page.is-active .page-head { animation: rf-rise var(--rf-slow) var(--rf-spring) both; }
+.page.is-active > * > *:not(.page-head):not(.dialog-layer):not(.viewer-overlay) {
+  animation: rf-rise var(--rf-slow) var(--rf-spring) both;
+}
+.page.is-active > * > *:nth-child(2) { animation-delay: 50ms; }
+.page.is-active > * > *:nth-child(3) { animation-delay: 100ms; }
+.page.is-active > * > *:nth-child(4) { animation-delay: 150ms; }
+.page.is-active > * > *:nth-child(5) { animation-delay: 200ms; }
+.page.is-active > * > *:nth-child(n+6) { animation-delay: 240ms; }
+/* Halaman dengan satu pembungkus saja (mis. empty state langsung di .page) */
+.page.is-active > .empty-state { animation: rf-rise var(--rf-slow) var(--rf-spring) 60ms both; }
+
+/* --- Modal / dialog: scrim memudar, kartu naik + membesar halus --- */
+.dialog-scrim { transition: opacity var(--rf-base) var(--rf-in-out); }
+.dialog-layer.is-open .dialog-scrim { animation: rf-scrim var(--rf-base) var(--rf-in-out) both; }
+.dialog {
+  transition: opacity var(--rf-fast) var(--rf-in-out), transform var(--rf-base) var(--rf-smooth);
+  will-change: transform, opacity;
+}
+.dialog-layer.is-open .dialog { animation: rf-dialog var(--rf-slow) var(--rf-spring) both; }
+.viewer-overlay { animation: rf-fade var(--rf-base) var(--rf-in-out) both; }
+.viewer-overlay > * { animation: rf-dialog var(--rf-slow) var(--rf-spring) 40ms both; }
+
+/* --- Menu "⋯", dropdown, date picker, toast --- */
+.more-menu, .action-menu .dropdown { animation: rf-pop var(--rf-base) var(--rf-spring) both; transform-origin: top right; }
+.toast { animation: rf-rise var(--rf-base) var(--rf-spring) both; box-shadow: var(--rf-float); }
+
+/* --- Drawer / bottom sheet: geser mulus + item muncul berurutan --- */
+.drawer-scrim { transition: opacity var(--rf-base) var(--rf-in-out); }
+.sidebar-drawer { transition: transform var(--rf-slow) var(--rf-smooth); will-change: transform; }
+.drawer-layer.is-open .drawer-item,
+.drawer-layer.is-open .drawer-heading,
+.drawer-layer.is-open .drawer-context {
+  animation: rf-item var(--rf-slow) var(--rf-spring) both;
+}
+.drawer-layer.is-open .drawer-context { animation-delay: 80ms; }
+.drawer-layer.is-open .drawer-group:nth-child(1) { --g: 120ms; }
+.drawer-layer.is-open .drawer-group:nth-child(2) { --g: 170ms; }
+.drawer-layer.is-open .drawer-group:nth-child(3) { --g: 220ms; }
+.drawer-layer.is-open .drawer-group:nth-child(4) { --g: 270ms; }
+.drawer-layer.is-open .drawer-heading { animation-delay: var(--g, 120ms); }
+.drawer-layer.is-open .drawer-item { animation-delay: calc(var(--g, 120ms) + 24ms * var(--i, 0)); }
+.drawer-item:nth-child(1) { --i: 1; } .drawer-item:nth-child(2) { --i: 2; } .drawer-item:nth-child(3) { --i: 3; }
+.drawer-item:nth-child(4) { --i: 4; } .drawer-item:nth-child(5) { --i: 5; } .drawer-item:nth-child(n+6) { --i: 6; }
+
+/* --- Interaksi mikro: semua kontrol ikut bergerak lembut --- */
+.btn, .icon-btn, .sidebar-btn, .drawer-btn, .tabbar > button, .mode-option, .card, .card-section,
+.project-card, .history-item, .ctx-pill, .ctx-switch, .more-item, .tab {
+  transition:
+    background-color var(--rf-fast) var(--rf-in-out),
+    border-color var(--rf-fast) var(--rf-in-out),
+    color var(--rf-fast) var(--rf-in-out),
+    box-shadow var(--rf-base) var(--rf-spring),
+    transform var(--rf-fast) var(--rf-spring);
+}
+@media (hover: hover) {
+  .project-card:hover, .card-section:hover { box-shadow: var(--rf-lift); }
+  .btn:not(:disabled):hover { transform: translateY(-1px); }
+}
+.btn:not(:disabled):active, .drawer-btn:active, .sidebar-btn:active { transform: scale(.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-delay: 0ms !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   2. LAYOUT DASAR
+   ========================================================================== */
+.app .main { padding-top: clamp(6px, 1vw, 12px); }
+/* Kepala halaman dirapatkan ke topbar (semua halaman) */
+.app .page-head { padding: 8px 0 14px; margin-bottom: 14px; }
+@media (max-width: 820px) { .app .page-head { padding: 4px 0 12px; margin-bottom: 12px; } }
+.main img, .main canvas, .main svg { max-width: 100%; }
+.main > .page { min-width: 0; }
+
+/* Tombol di baris aksi tidak meluber di layar sempit */
+.head-actions, .page-head-aside { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Empty state: kartu lembut, ikon dalam lingkaran, tombol rapi */
+.empty-state {
+  display: grid; justify-items: center; align-content: center; gap: 6px;
+  padding: clamp(36px, 7vw, 72px) clamp(16px, 4vw, 32px);
+  border: 1px dashed var(--line-2); border-radius: var(--r-xl);
+  background:
+    radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--teal) 6%, transparent), transparent 70%),
+    var(--card);
+  box-shadow: none;
+}
+.empty-state > svg:first-child {
+  box-sizing: content-box; width: 40px; height: 40px; padding: 18px; margin: 0 0 10px;
+  border-radius: 50%; background: var(--teal-soft); color: var(--teal) !important;
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--teal-soft) 45%, transparent);
+}
+.empty-state h3 { margin: 0; text-wrap: balance; }
+.empty-state p { max-width: 46ch; margin: 0 auto; text-wrap: pretty; }
+.empty-state .btn { margin-top: 16px; }
+
+/* ==========================================================================
+   3. PILIHAN MODE (Full Replace / Merge, jenis impor)
+   ========================================================================== */
+.restore-mode-selector, .import-type-selector {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px;
+}
+.mode-option {
+  position: relative; align-items: center; gap: 14px; padding: 16px;
+  border: 1.5px solid var(--line); border-radius: var(--r-lg); background: var(--card);
+}
+.mode-option > svg {
+  box-sizing: content-box; flex: none; width: 18px; height: 18px; margin: 0; padding: 9px;
+  border-radius: 12px; background: var(--paper-2); color: var(--ink-2);
+  transition: background-color var(--rf-base) var(--rf-spring), color var(--rf-base) var(--rf-spring), transform var(--rf-base) var(--rf-spring);
+}
+.mode-option strong { font-size: 15px; letter-spacing: -.01em; }
+.mode-option small { margin-top: 3px; font-size: 12.5px; line-height: 1.45; }
+/* terpilih: ikon tetap berwarna (tidak putih), tanda cek kecil tanpa lingkaran */
+.mode-option::after {
+  content: ''; position: absolute; top: 14px; right: 16px; width: 5px; height: 10px;
+  border-right: 2px solid var(--teal); border-bottom: 2px solid var(--teal);
+  transform: rotate(45deg) scale(.4); opacity: 0;
+  transition: opacity var(--rf-base) var(--rf-spring), transform var(--rf-base) var(--rf-spring);
+}
+.restore-mode-selector input:checked + .mode-option::after { opacity: 1; transform: rotate(45deg) scale(1); }
+.restore-mode-selector input:checked + .mode-option > svg { background: color-mix(in srgb, var(--teal) 14%, var(--card)); color: var(--teal); }
+.restore-mode-selector label:hover .mode-option { border-color: var(--mute-2); box-shadow: var(--rf-lift); }
+.restore-mode-selector input:checked + .mode-option {
+  border-color: var(--teal); background: color-mix(in srgb, var(--teal-soft) 70%, var(--card));
+  box-shadow: 0 0 0 3px var(--teal-ring);
+}
+.restore-mode-selector input:focus-visible + .mode-option { outline: 2px solid var(--teal); outline-offset: 3px; }
+
+/* ==========================================================================
+   4. MENU (DRAWER / BOTTOM SHEET) — daftar yang rapi, bukan kisi tak rata
+   ========================================================================== */
+@media (max-width: 820px) {
+  .sidebar-drawer { max-height: min(88dvh, 720px); border-radius: 24px 24px 0 0; box-shadow: var(--rf-float); }
+  .drawer-scroll { padding: 0 14px 14px; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; }
+  .drawer-group + .drawer-group { margin-top: 4px; }
+  .drawer-layer .drawer-heading { padding: 16px 8px 8px; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; }
+
+  /* satu kolom, dikelompokkan dalam satu kartu dengan pemisah tipis */
+  .drawer-layer .drawer-nav {
+    display: flex; flex-direction: column; gap: 0; padding: 0; overflow: clip; overscroll-behavior: auto;
+    border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
+  }
+  .drawer-layer .drawer-item + .drawer-item { border-top: 1px solid var(--hairline); }
+  .drawer-layer .drawer-btn {
+    flex-direction: row; justify-content: flex-start; align-items: center; text-align: left;
+    width: 100%; min-height: 54px; padding: 0 14px 0 12px; gap: 14px;
+    border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  }
+  .drawer-layer .drawer-icon {
+    box-sizing: content-box; width: 20px; height: 20px; padding: 7px; flex: none;
+    border-radius: 11px; background: var(--paper-2); color: var(--ink-2);
+  }
+  .drawer-layer .drawer-label { flex: 1; font-size: 15px; font-weight: 550; text-align: left; line-height: 1.25; }
+  .drawer-layer .drawer-btn::after {
+    content: ''; flex: none; width: 7px; height: 7px; margin-right: 4px;
+    border-right: 2px solid var(--mute-2); border-top: 2px solid var(--mute-2); transform: rotate(45deg);
+  }
+  .drawer-layer .drawer-item.is-active .drawer-btn { background: var(--teal-soft); color: var(--teal-2); }
+  .drawer-layer .drawer-item.is-active .drawer-icon { background: color-mix(in srgb, var(--teal) 14%, var(--card)); color: var(--teal); }
+  .drawer-layer .drawer-item.is-active .drawer-btn::before { display: none; }
+  .drawer-layer .drawer-item.is-active .drawer-btn::after { border-color: var(--teal); }
+  .drawer-layer .drawer-item.is-idle .drawer-label { color: var(--mute); }
+  .drawer-layer .drawer-badge { position: static; margin-left: auto; }
+  .drawer-btn:active { background: var(--paper-2); transform: none; }
+
+  /* Kartu konteks proyek/sumur: lebih lega, dua kolom sejajar */
+  .drawer-context .active-context { border-radius: var(--r-lg); }
+}
+
+/* Tablet (panel samping 821–1099px): tetap daftar vertikal */
+@media (min-width: 821px) {
+  .drawer-nav { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   5. MODAL → BOTTOM SHEET DI HP
+   ========================================================================== */
+@media (max-width: 640px) {
+  .dialog-layer { align-items: end; justify-items: stretch; padding: 0; }
+  .dialog-layer .dialog,
+  .dialog-layer .dialog-wide {
+    width: 100%; max-width: none; max-height: 92dvh; margin: 0;
+    border-radius: 24px 24px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  .dialog-layer.is-open .dialog { animation: rf-sheet var(--rf-slow) var(--rf-smooth) both; }
+  .dialog-layer .dialog:not(.dialog-wide)::before {
+    content: ''; display: block; width: 38px; height: 4px; margin: -10px auto 16px;
+    border-radius: 4px; background: var(--line-2);
+  }
+  .dialog-actions { flex-direction: column-reverse; }
+  .dialog-actions .btn, .dialog-actions button { width: 100%; justify-content: center; }
+  .dialog-wide .form-actions { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ==========================================================================
+   6. TOPBAR & KEPALA HALAMAN
+   ========================================================================== */
+@media (max-width: 820px) {
+  .topbar-left, .brand, .brand-text { min-width: 0; }
+  .ctx-pill { max-width: min(100%, 68vw); }
+  .ctx-pill-part { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .page-head { padding-top: 4px; }
+}
+@media (max-width: 480px) {
+  .restore-mode-selector, .import-type-selector { grid-template-columns: 1fr; }
+  .history-item { flex-direction: column; align-items: stretch; }
+  .history-item .btn { align-self: flex-start; }
+}
+
+/* ==========================================================================
+   7. TABEL — modern & responsif (Proyek, Sumur)
+   Desktop: tabel rapi · Tablet: kolom sekunder disembunyikan · HP: kartu
+   ========================================================================== */
+.table-wrap {
+  background: var(--card);
+  border: 1px solid var(--hairline); border-radius: var(--r-xl);
+  box-shadow: 0 1px 2px rgba(21, 32, 30, .04), 0 18px 40px -28px rgba(21, 32, 30, .28);
+  overflow-x: auto; overflow-y: hidden;
+}
+.table-wrap .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.table-wrap .data-table thead th {
+  position: static; padding: 14px 18px; font-size: 11.5px; font-weight: 650; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--mute); white-space: nowrap;
+  background: color-mix(in srgb, var(--paper-2) 55%, var(--card));
+  border-bottom: 1px solid var(--hairline);
+}
+.table-wrap .data-table thead th:hover { color: var(--ink); background: color-mix(in srgb, var(--paper-2) 80%, var(--card)); }
+.table-wrap .data-table thead th svg { vertical-align: -2px; margin-left: 2px; opacity: .6; }
+.table-wrap .data-table tbody td {
+  padding: 16px 18px; vertical-align: middle; border-bottom: 1px solid var(--hairline);
+  background: transparent; transition: background-color var(--rf-fast) var(--rf-in-out);
+}
+.table-wrap .data-table tbody tr:last-child td { border-bottom: 0; }
+.table-wrap .data-table tbody tr { cursor: pointer; }
+.table-wrap .data-table tbody tr:hover td { background: color-mix(in srgb, var(--teal-soft) 38%, var(--card)); }
+.table-wrap .data-table tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--teal); }
+
+.table-wrap .col-main { min-width: 220px; }
+.table-wrap .well-name-wrap, .table-wrap .project-name-wrap { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.table-wrap .col-main strong { font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; color: var(--ink); }
+.table-wrap .well-code, .table-wrap .project-code {
+  padding: 2px 8px; border-radius: 6px; background: var(--paper-2); color: var(--ink-2);
+  font-size: 11.5px; font-weight: 600; letter-spacing: .02em;
+}
+.table-wrap .well-meta, .table-wrap .project-meta { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--mute); font-size: 12.5px; }
+.table-wrap td.mono { color: var(--ink-2); white-space: nowrap; }
+.table-wrap .col-actions { width: 1%; text-align: right; white-space: nowrap; }
+.table-wrap .empty-row { padding: 40px 16px !important; text-align: center; color: var(--mute); }
+
+/* Tablet: sembunyikan kolom paling sekunder agar tidak perlu geser mendatar */
+@media (max-width: 1180px) {
+  .project-detail-page .th-coords, .project-detail-page td.coords { display: none; }
+}
+@media (max-width: 820px) and (min-width: 641px) {
+  .table-wrap .data-table thead th, .table-wrap .data-table tbody td { padding-left: 14px; padding-right: 14px; }
+  .table-wrap .col-main { min-width: 180px; }
+}
+
+/* HP: tiap baris jadi kartu — judul + menu di atas, data dalam kisi 2 kolom */
+@media (max-width: 640px) {
+  .table-wrap { background: none; border: 0; box-shadow: none; border-radius: 0; overflow: visible; }
+  .app .data-table.is-cards { display: block; min-width: 0; }
+  .app .data-table.is-cards thead { display: none; }
+  .app .data-table.is-cards tbody { display: grid; gap: 14px; }
+  .app .data-table.is-cards tbody tr {
+    position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px;
+    padding: 16px; border: 1px solid var(--hairline); border-radius: var(--r-xl); background: var(--card);
+    box-shadow: 0 1px 2px rgba(21, 32, 30, .04), 0 14px 30px -22px rgba(21, 32, 30, .35);
+    transition: transform var(--rf-fast) var(--rf-spring), box-shadow var(--rf-base) var(--rf-spring);
+  }
+  .app .data-table.is-cards tbody tr:active { transform: scale(.985); }
+  .app .data-table.is-cards tbody tr:hover td:first-child { box-shadow: none; }
+  .app .data-table.is-cards tbody td {
+    display: block; padding: 0; border: 0; min-width: 0; text-align: left; background: none !important;
+  }
+  .app .data-table.is-cards tbody td::before {
+    content: attr(data-label); display: block; margin-bottom: 4px;
+    font-family: var(--font); font-size: 10.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--mute-2);
+  }
+  .app .data-table.is-cards td.col-main {
+    grid-column: 1 / -1; padding: 0 44px 14px 0; border-bottom: 1px dashed var(--line);
+  }
+  .app .data-table.is-cards td.col-main::before { display: none; }
+  .app .data-table.is-cards td.col-actions { position: absolute; top: 10px; right: 10px; width: auto; }
+  .app .data-table.is-cards td.col-actions::before { display: none; }
+  .app .data-table.is-cards td.coords { grid-column: 1 / -1; display: block !important; }
+  .app .data-table.is-cards td.mono { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .app .data-table.is-cards td[colspan] {
+    grid-column: 1 / -1; padding: 28px 0; text-align: center; color: var(--mute);
+  }
+  .app .data-table.is-cards td[colspan]::before { display: none; }
+}
+
+/* --- kartu tabel HP: sel berlabel duduk berdampingan (2 kolom), bukan satu per baris --- */
+@media (max-width: 640px) {
+  .app .data-table.is-cards tbody td[data-label] {
+    grid-column: auto; padding-top: 0; border-top: 0; justify-content: flex-start;
+  }
+  .app .data-table.is-cards tbody td[data-label="Status"]::before { display: block; }
+  .app .data-table.is-cards tbody td.coords[data-label] { grid-column: 1 / -1; order: 10; }
+  .app .data-table.is-cards td.col-actions { margin: 0; }
+}
+
+/* --- ringkasan proyek & toolbar filter --- */
+@media (min-width: 821px) {
+  .toolbar-filters { display: flex; flex-wrap: nowrap; align-items: stretch; gap: 10px; flex: 0 0 auto; width: auto; }
+  .toolbar-filters .field, .toolbar-filters .filter-select { min-width: 170px; width: auto; }
+}
+@media (max-width: 820px) {
+  .project-overview .overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .project-overview .overview-card { padding: 14px 16px; min-height: 0; }
+  .project-overview .overview-card h4 { margin-bottom: 6px; }
+}
+@media (max-width: 340px) {
+  .project-overview .overview-grid { grid-template-columns: 1fr; }
+}

@@ -724,7 +724,7 @@ export default function DocumentationPage({ notify }) {
   if (!activeWellId) {
     return (
       <div className="documentation-page">
-        <PageHead kicker="03 · Dokumentasi" title="Dokumentasi Sumur" description="Kelola foto dan dokumen untuk sumur aktif.">
+        <PageHead kicker="Pekerjaan sumur" title="Galeri & Dokumen" description="Kelola foto dan dokumen untuk sumur aktif.">
           <div className="tally"><b className="mono">0</b><span> item</span></div>
         </PageHead>
         <div className="empty-state">
@@ -741,7 +741,7 @@ export default function DocumentationPage({ notify }) {
 
   return (
     <div className="documentation-page">
-      <PageHead kicker={`Sumur: ${well?.wellCode}`} title="Dokumentasi Sumur" description="Foto kegiatan dan dokumen pendukung konstruksi sumur.">
+      <PageHead kicker={`Sumur: ${well?.wellCode}`} title="Galeri & Dokumen" description="Foto kegiatan dan dokumen pendukung konstruksi sumur.">
         <div className="head-actions">
           <div className="tally"><b className="mono">{totalItems}</b><span> item</span></div>
           <Button variant="primary" icon={Camera} onClick={() => setShowPhotoUpload(true)}>Tambah Foto</Button>

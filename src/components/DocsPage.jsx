@@ -87,8 +87,8 @@ export default function DocsPage({ activity, setActivity, notify, onSave, onRese
   return (
     <div className="docs">
       <PageHead
-        kicker="03 · Dokumentasi"
-        title="Dokumentasi kegiatan"
+        kicker="Pekerjaan sumur"
+        title="Foto Kegiatan"
         description="Foto kegiatan borehole camera di lapangan. Setiap kategori menampung hingga tiga foto."
       >
         <div className="tally"><b className="mono">{total}</b><span>/ 18 foto</span></div>

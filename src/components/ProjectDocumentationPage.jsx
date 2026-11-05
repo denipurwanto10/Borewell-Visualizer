@@ -11,6 +11,7 @@ import {
 import { Button, Field, PageHead, useConfirm } from '../components/Primitives';
 import { useProject } from '../context/ProjectContext';
 import { photoAPI, documentAPI } from '../api/client';
+import { isValidBackendId } from '../utils/ids';
 import {
   PHOTO_CATEGORIES,
   DOCUMENT_CATEGORIES,
@@ -391,28 +392,24 @@ export default function ProjectDocumentationPage({ notify }) {
   // Load documentation
   const loadDocumentation = useCallback(async () => {
     if (!activeProjectId) return;
-    if (!isAuthenticated) return;
+
+    // Prevent requests with non-backend (offline/generated) project IDs.
+    if (isAuthenticated && !isValidBackendId(activeProjectId)) {
+      setPhotos([]);
+      setDocuments([]);
+      return;
+    }
 
     try {
-      // API mode: fetch from backend
+      // Use ProjectContext helpers so responses are normalized to the
+      // frontend shape and auth/offline fallbacks are handled consistently.
       const [photoList, docList] = await Promise.all([
-        photoAPI.list('project', activeProjectId),
-        documentAPI.list('project', activeProjectId),
+        getPhotos('project', activeProjectId),
+        getDocuments('project', activeProjectId),
       ]);
 
-      // Normalize response: API returns { data: [...], meta: {...} }
-      // Ensure we always get an array, even if data is null/undefined
-      const normalize = (resp) => {
-        if (!resp) return [];
-        const data = resp.data;
-        if (Array.isArray(data)) return data;
-        // Handle legacy/erroneous responses where data might be the array directly
-        if (Array.isArray(resp)) return resp;
-        return [];
-      };
-
-      const photosArray = normalize(photoList);
-      const documentsArray = normalize(docList);
+      const photosArray = Array.isArray(photoList) ? photoList : [];
+      const documentsArray = Array.isArray(docList) ? docList : [];
 
       setPhotos(photosArray);
       setDocuments(documentsArray);
@@ -437,7 +434,7 @@ export default function ProjectDocumentationPage({ notify }) {
       setPhotos([]);
       setDocuments([]);
     }
-  }, [activeProjectId, isAuthenticated, notify]);
+  }, [activeProjectId, isAuthenticated, notify, getPhotos, getDocuments]);
 
   useEffect(() => {
     loadDocumentation();
@@ -492,6 +489,10 @@ export default function ProjectDocumentationPage({ notify }) {
 
   // Photo handlers
   const handlePhotoUpload = async (files, formData) => {
+    if (isAuthenticated && !isValidBackendId(activeProjectId)) {
+      notify('Proyek aktif tidak valid untuk dokumentasi', 'error');
+      return;
+    }
     if (isAuthenticated) {
       for (const file of files) {
         try {
@@ -512,6 +513,10 @@ export default function ProjectDocumentationPage({ notify }) {
   };
 
   const handleDocumentUpload = async (files, formData) => {
+    if (isAuthenticated && !isValidBackendId(activeProjectId)) {
+      notify('Proyek aktif tidak valid untuk dokumentasi', 'error');
+      return;
+    }
     if (isAuthenticated) {
       for (const file of files) {
         try {
@@ -634,7 +639,7 @@ export default function ProjectDocumentationPage({ notify }) {
   if (!activeProjectId) {
     return (
       <div className="documentation-page">
-        <PageHead kicker="Dokumentasi Proyek" title="Dokumentasi Proyek" description="Kelola foto dan dokumen untuk proyek aktif.">
+        <PageHead kicker="Proyek" title="Dokumen Proyek" description="Kelola foto dan dokumen untuk proyek aktif.">
           <div className="tally"><b className="mono">0</b><span> item</span></div>
         </PageHead>
         <div className="empty-state">
@@ -651,7 +656,7 @@ export default function ProjectDocumentationPage({ notify }) {
 
   return (
     <div className="documentation-page">
-      <PageHead kicker={`Proyek: ${project}`} title="Dokumentasi Proyek" description="Foto dan dokumen tingkat proyek (izin, kontrak, spesifikasi, dll.).">
+      <PageHead kicker={`Proyek: ${project}`} title="Dokumen Proyek" description="Foto dan dokumen tingkat proyek (izin, kontrak, spesifikasi, dll.).">
         <div className="head-actions">
           <div className="tally"><b className="mono">{totalItems}</b><span> item</span></div>
           <Button variant="primary" icon={Camera} onClick={() => setShowPhotoUpload(true)}>Tambah Foto</Button>

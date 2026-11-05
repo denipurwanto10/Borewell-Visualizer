@@ -25,7 +25,7 @@ function ProjectRow({ project, onEdit, onDelete, onDuplicate, onArchive, onResto
   const isArchived = project.status === 'archived';
 
   return (
-    <tr className={isArchived ? 'is-archived' : ''}>
+    <tr className={isArchived ? 'is-archived' : ''} onClick={() => onView(project.id)}>
       <td className="col-main">
         <div className="project-name-wrap">
           <strong>{project.projectName}</strong>
@@ -41,7 +41,7 @@ function ProjectRow({ project, onEdit, onDelete, onDuplicate, onArchive, onResto
       <td className="mono" data-label="Jumlah sumur">{project.wellCount || 0}</td>
       <td className="mono" data-label="Mulai">{project.startDate ? new Date(project.startDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
       <td className="mono" data-label="Diperbarui">{project.updatedAt ? new Date(project.updatedAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-      <td className="col-actions">
+      <td className="col-actions" onClick={(e) => e.stopPropagation()}>
         <ActionMenu icon={MoreHorizontal}>
             <button onClick={() => onView(project.id)}><ExternalLink size={16} /><span>Lihat detail</span></button>
             <button onClick={() => onEdit(project)}><Edit size={16} /><span>Edit</span></button>
@@ -166,11 +166,11 @@ export default function ProjectsPage() {
     e.preventDefault();
     setSaving(true);
     if (editingProject) {
-      const res = updateProject(editingProject.id, formData);
+      const res = await updateProject(editingProject.id, formData);
       if (res.success) closeForm();
       else setFormErrors(res.errors);
     } else {
-      const res = createProject(formData);
+      const res = await createProject(formData);
       if (res.success) closeForm();
       else setFormErrors(res.errors);
     }
@@ -201,7 +201,7 @@ export default function ProjectsPage() {
   if (projects.length === 0 && !showForm) {
     return (
       <div className="projects-page">
-        <PageHead kicker="01 · Proyek" title="Kelola Proyek" description="Daftar proyek sumur bor. Buat proyek baru untuk memulai.">
+        <PageHead kicker="Proyek" title="Proyek & Sumur" description="Daftar proyek sumur bor. Buat proyek baru untuk memulai.">
           <Button variant="primary" icon={Plus} onClick={openCreateForm}>Buat Proyek</Button>
         </PageHead>
         <div className="empty-state">
@@ -217,7 +217,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="projects-page">
-      <PageHead kicker="01 · Proyek" title="Kelola Proyek" description={`Total ${projects.length} proyek`}>
+      <PageHead kicker="Proyek" title="Proyek & Sumur" description={`Total ${projects.length} proyek`}>
         <Button variant="primary" icon={Plus} onClick={openCreateForm}>Buat Proyek</Button>
       </PageHead>
 

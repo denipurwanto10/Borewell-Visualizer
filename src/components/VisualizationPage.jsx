@@ -165,8 +165,8 @@ export default function VisualizationPage({ model, setModel, canvasRef, notify }
   return (
     <div className="viz" data-view={view}>
       <PageHead
-        kicker="01 · Visualisasi"
-        title="Konstruksi sumur bor"
+        kicker="Pekerjaan sumur"
+        title="Visualisasi Pipa"
         description="Susun pipa, saringan, dan open hole, lalu lihat skemanya terbentuk secara proporsional."
       />
 

@@ -48,15 +48,15 @@ var (
 )
 
 func appDSN() string {
-	return "postgres://borewell_app:app_password_change_me@localhost:5433/borewell_fs2_test?sslmode=disable"
+	return "postgres://borewell_app:app_password_change_me@localhost:5432/borewell_fs2_test?sslmode=disable"
 }
 
 func migrateDSN() string {
-	return "postgres://borewell_migrate:migrate_password_change_me@localhost:5433/borewell_fs2_test?sslmode=disable"
+	return "postgres://borewell_migrate:migrate_password_change_me@localhost:5432/borewell_fs2_test?sslmode=disable"
 }
 
 func postgresDSN() string {
-	return "postgres://postgres:changeme@localhost:5433/borewell_fs2_test?sslmode=disable"
+	return "postgres://postgres:changeme@localhost:5432/borewell_fs2_test?sslmode=disable"
 }
 
 func TestMain(m *testing.M) {

@@ -33,15 +33,15 @@ var (
 )
 
 func fs3AppDSN() string {
-	return "postgres://borewell_app:app_password_change_me@localhost:5433/borewell_fs3_test?sslmode=disable"
+	return "postgres://borewell_app:app_password_change_me@localhost:5432/borewell_fs3_test?sslmode=disable"
 }
 
 func fs3MigrateDSN() string {
-	return "postgres://borewell_migrate:migrate_password_change_me@localhost:5433/borewell_fs3_test?sslmode=disable"
+	return "postgres://borewell_migrate:migrate_password_change_me@localhost:5432/borewell_fs3_test?sslmode=disable"
 }
 
 func fs3PostgresDSN() string {
-	return "postgres://postgres:changeme@localhost:5433/borewell_fs3_test?sslmode=disable"
+	return "postgres://postgres@localhost:5432/borewell_fs3_test?sslmode=disable"
 }
 
 func TestMain(m *testing.M) {
@@ -805,4 +805,74 @@ func TestRLSAndOwnership(t *testing.T) {
 	})
 
 	fmt.Println("RLS and Ownership: PASS")
+}
+
+func TestDocumentationAPI(t *testing.T) {
+	fs3ResetTestState(t)
+	seed := fs3SuiteSeed
+	s, _ := fs3newTestServer(t)
+
+	tokenA, _ := fs3login(t, s, "user-a-fs3@local.test", fs3TestPassword)
+	tokenAdmin, _ := fs3login(t, s, fs3TestAdminEmail, fs3TestAdminPassword)
+
+	t.Run("valid project id loads documentation", func(t *testing.T) {
+		res := fs3do(t, s, http.MethodGet, "/api/v1/projects/"+seed["projA"]+"/photos", nil, "", tokenA)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("list photos: expected 200, got %d", res.StatusCode)
+		}
+		var resp respData
+		fs3jsonBody(res, &resp)
+		if resp.Data == nil {
+			// normalize null to empty slice acceptable
+		}
+		res = fs3do(t, s, http.MethodGet, "/api/v1/projects/"+seed["projA"]+"/documents", nil, "", tokenA)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("list documents: expected 200, got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("invalid id rejected", func(t *testing.T) {
+		res := fs3do(t, s, http.MethodGet, "/api/v1/projects/not-a-uuid/photos", nil, "", tokenA)
+		if res.StatusCode != http.StatusBadRequest {
+			t.Fatalf("invalid id photos: expected 400, got %d", res.StatusCode)
+		}
+		var body map[string]interface{}
+		fs3jsonBody(res, &body)
+		if body["detail"] != "Invalid ID" {
+			t.Fatalf("expected Invalid ID, got %v", body["detail"])
+		}
+		res = fs3do(t, s, http.MethodGet, "/api/v1/projects/not-a-uuid/documents", nil, "", tokenA)
+		if res.StatusCode != http.StatusBadRequest {
+			t.Fatalf("invalid id documents: expected 400, got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("documentation belonging to another project", func(t *testing.T) {
+		res := fs3do(t, s, http.MethodGet, "/api/v1/projects/"+seed["projB"]+"/photos", nil, "", tokenA)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("cross project photos: expected 200, got %d", res.StatusCode)
+		}
+		var resp respData
+		fs3jsonBody(res, &resp)
+		photos, _ := resp.Data.([]interface{})
+		if len(photos) != 0 {
+			t.Fatalf("user A should not see project B photos, got %d", len(photos))
+		}
+	})
+
+	t.Run("admin can access documentation", func(t *testing.T) {
+		res := fs3do(t, s, http.MethodGet, "/api/v1/projects/"+seed["projA"]+"/photos", nil, "", tokenAdmin)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("admin photos: expected 200, got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("unauthenticated rejected", func(t *testing.T) {
+		res := fs3do(t, s, http.MethodGet, "/api/v1/projects/"+seed["projA"]+"/photos", nil, "", "")
+		if res.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("unauth photos: expected 401, got %d", res.StatusCode)
+		}
+	})
+
+	fmt.Println("Documentation API: PASS")
 }

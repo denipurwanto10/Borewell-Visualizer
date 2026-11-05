@@ -1,0 +1,44 @@
+/* ==========================================================================
+   mobile-shell.css — topbar & tab bawah di HP (≤ 820px). Dimuat paling akhir.
+   - Pill konteks memakai lebar yang tersedia (nama proyek tidak terpotong dini)
+   - Tombol PDF jadi ikon saja agar judul + pill punya ruang
+   - Tab bawah: indikator aktif berbentuk pil di belakang ikon, label penuh
+   ========================================================================== */
+@media (max-width: 820px) {
+  /* ---------- Topbar ---------- */
+  .topbar-inner { align-items: center; gap: 12px; min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+  .brand-text { gap: 6px; width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+  .topbar-left, .brand { min-width: 0; }
+  .brand-text strong { font-size: 18px; line-height: 1.15; }
+
+  .ctx-pill { width: auto; max-width: 100%; min-width: 0; overflow: hidden; min-height: 28px; padding: 0 10px; gap: 6px; font-size: 12.5px; }
+  .ctx-pill-part { flex: 0 1 auto; max-width: none; min-width: 0; }
+  .ctx-pill-part:first-of-type { flex: 1 1 auto; }
+  .ctx-pill-part.is-well { flex: 0 0 auto; max-width: 46%; }
+  .ctx-pill-caret { display: block; }
+
+  /* PDF: tombol ikon 44px (target sentuh) */
+  .topbar-actions .btn { --h: 44px; width: 44px; min-width: 44px; padding: 0; justify-content: center; border-radius: 12px; }
+  .topbar-actions .btn .btn-label { display: none; }
+  .topbar-actions .btn .btn-icon { margin: 0; }
+  .more-btn { width: 44px; height: 44px; }
+
+  /* ---------- Tab bawah ---------- */
+  .tabbar { padding: 0 6px var(--safe-b); }
+  .tabbar > button {
+    margin: 0; padding: 8px 0 6px; gap: 4px; min-width: 0; border-radius: 12px;
+    background: transparent !important; box-shadow: none !important;
+    font-size: 11px; font-weight: 500; letter-spacing: -.01em; color: var(--mute);
+  }
+  .tabbar > button svg {
+    width: 56px; height: 30px; padding: 5px 18px; box-sizing: border-box; border-radius: 15px;
+    transition: background-color .2s ease, color .2s ease; transform: none !important;
+  }
+  .tabbar > button span { overflow: visible; text-overflow: clip; max-width: none; }
+  .tabbar > button.is-active { color: var(--teal-2); font-weight: 650; }
+  .tabbar > button.is-active svg { background: var(--teal-soft); color: var(--teal-2); }
+}
+@media (max-width: 360px) {
+  .tabbar > button { font-size: 10.5px; letter-spacing: -.02em; }
+  .tabbar > button svg { width: 48px; padding: 5px 14px; }
+}

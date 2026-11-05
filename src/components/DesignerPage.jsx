@@ -240,7 +240,7 @@ export default function DesignerPage({ notify }) {
   if (!activeWellId) {
     return (
       <div className="designer-page">
-        <PageHead kicker="03 · Desain Sumur" title="Desainer Konstruksi Sumur"
+        <PageHead kicker="Pekerjaan sumur" title="Desain Konstruksi"
           description="Pilih atau buat sumur dari halaman Proyek untuk mulai merancang konstruksi." />
         <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
           <RotateCcw size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
@@ -255,7 +255,7 @@ export default function DesignerPage({ notify }) {
 
   return (
     <div className="designer-page">
-      <PageHead kicker="03 · Desain Sumur" title="Desainer Konstruksi Sumur"
+      <PageHead kicker="Pekerjaan sumur" title="Desain Konstruksi"
         description="Rancang komponen sumur bor dengan kedalangan, diameter, dan validasi teknis.">
         <div className="page-head-aside">
           <Button variant="ghost" icon={Undo} onClick={undo} disabled={!history || !history.canUndo}>

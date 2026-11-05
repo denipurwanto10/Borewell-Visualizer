@@ -83,8 +83,8 @@ export default function DashboardPage({ onNavigate }) {
   return (
     <div className="dashboard-page">
       <PageHead
-        kicker="00 · Dashboard"
-        title="Ringkasan Proyek"
+        kicker="Umum"
+        title="Beranda"
         description="Gambaran keseluruhan proyek dan sumur bor Anda."
       >
         <div className="header-actions">

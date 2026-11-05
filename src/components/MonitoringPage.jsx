@@ -315,7 +315,7 @@ export default function MonitoringPage() {
   if (!activeWellId) {
     return (
       <div className="monitoring-page">
-        <PageHead kicker="05 · Monitoring Air Tanah" title="Monitoring Muka Air Tanah"
+        <PageHead kicker="Pekerjaan sumur" title="Muka Air Tanah"
           description="Pilih atau buat sumur dari halaman Proyek untuk mulai mencatat pengukuran muka air tanah." />
         <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
           <Droplets size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px', display: 'block' }} />
@@ -330,7 +330,7 @@ export default function MonitoringPage() {
 
   return (
     <div className="monitoring-page">
-      <PageHead kicker="05 · Monitoring Air Tanah" title="Monitoring Muka Air Tanah"
+      <PageHead kicker="Pekerjaan sumur" title="Muka Air Tanah"
         description="Catat pengukuran muka air tanah berdasarkan waktu. Setiap sumur memiliki riwayat monitoring tersendiri.">
         <div className="page-head-aside">
           <button className="btn btn-outline" onClick={() => setShowImportModal(true)}>

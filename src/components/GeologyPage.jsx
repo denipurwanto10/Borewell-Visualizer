@@ -256,7 +256,7 @@ export default function GeologyPage() {
   if (!activeWellId) {
     return (
       <div className="geology-page">
-        <PageHead kicker="04 · Log Geologi" title="Log Geologi Sumur Bor"
+        <PageHead kicker="Pekerjaan sumur" title="Log Geologi"
           description="Pilih atau buat sumur dari halaman Proyek untuk mulai mencatat kondisi geologi bawah permukaan." />
         <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
           <Layers size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px', display: 'block' }} />
@@ -269,7 +269,7 @@ export default function GeologyPage() {
 
   return (
     <div className="geology-page">
-      <PageHead kicker="04 · Log Geologi" title="Log Geologi Sumur Bor"
+      <PageHead kicker="Pekerjaan sumur" title="Log Geologi"
         description="Catat lapisan geologi bawah permukaan berdasarkan interval kedalaman. Setiap sumur memiliki log geologi tersendiri.">
         <div className="page-head-aside">
           <button className="btn btn-outline" onClick={resetGeology} disabled={geology.layers.length === 0}>

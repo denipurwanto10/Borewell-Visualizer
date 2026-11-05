@@ -11,6 +11,49 @@ import {
 import { COMPONENT_LABELS } from './designer/model.js';
 import { MEASUREMENT_METHODS, REFERENCE_POINTS } from './monitoring/model.js';
 
+// ---------------------------------------------------------------------------
+// Tema PDF premium (netral — tanpa header/footer atau identitas perusahaan).
+// ---------------------------------------------------------------------------
+const PDF_THEME = {
+  ink: [21, 32, 30],
+  label: [52, 68, 64],
+  muted: [112, 124, 120],
+  teal: [13, 95, 90],
+  line: [208, 215, 212],
+  labelBg: [239, 243, 242],
+  paper: [248, 250, 249],
+};
+
+function drawPdfTitle(pdf, text, x, y, { align = 'left', size = 15 } = {}) {
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(size);
+  pdf.setTextColor(...PDF_THEME.ink);
+  pdf.text(text, x, y, { align });
+  const barX = align === 'center' ? x - 7 : x;
+  pdf.setFillColor(...PDF_THEME.teal);
+  pdf.rect(barX, y + 2.6, 14, 0.9, 'F');
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(0, 0, 0);
+}
+
+/** Aksen tipis di tepi atas + nomor halaman halus di setiap halaman. */
+function finalizePdf(pdf, { skipFirst = false } = {}) {
+  const total = pdf.getNumberOfPages();
+  const W = pdf.internal.pageSize.getWidth();
+  const H = pdf.internal.pageSize.getHeight();
+  for (let i = 1; i <= total; i++) {
+    pdf.setPage(i);
+    pdf.setFillColor(...PDF_THEME.teal);
+    pdf.rect(0, 0, W, 1.2, 'F');
+    if (skipFirst && i === 1) continue;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...PDF_THEME.muted);
+    pdf.text(`${i} / ${total}`, W / 2, H - 8, { align: 'center' });
+  }
+  pdf.setTextColor(0, 0, 0);
+}
+
 function formatNumber(num) {
   if (num === null || num === undefined || num === '-' || num === '') return '-';
   if (typeof num === 'string') {
@@ -95,8 +138,8 @@ function renderConstructionDiagram(pdf, x, y, w, h, legacyModel, extraComponents
     if (Number.isFinite(d)) maxDepth = Math.max(maxDepth, d);
   }
 
-  const plotTop = 15;
-  const plotBottom = h - 10;
+  const plotTop = y + 15;
+  const plotBottom = y + h - 10;
   const plotLeft = x + 25; // Space for depth ruler
   const plotRight = x + w - 5;
   const wellAxisPx = plotLeft + (plotRight - plotLeft) * 0.3; // Well on left side
@@ -404,10 +447,7 @@ function renderGeologicalLog(pdf, x, y, w, h, geology, well, project) {
   pdf.rect(x, y, w, h, 'F');
 
   // Title
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(15);
-  pdf.setTextColor(0, 0, 0);
-  pdf.text('LOG GEOLOGI SUMUR BOR', pageW / 2, y + 12, { align: 'center' });
+  drawPdfTitle(pdf, 'LOG GEOLOGI SUMUR BOR', pageW / 2, y + 12, { align: 'center', size: 15 });
 
   // Well / project meta
   pdf.setFont('helvetica', 'normal');
@@ -430,7 +470,7 @@ function renderGeologicalLog(pdf, x, y, w, h, geology, well, project) {
   if (maxDepth === 0) maxDepth = 10;
 
   const plotTop = y + 42;
-  const plotBottom = y + h - 40;
+  const plotBottom = y + h - (34 + Math.min(validLayers.length, 8) * 7);
   const rulerLeft = x + 12;
   const rulerWidth = 30;
   const colLeft = rulerLeft + rulerWidth;
@@ -532,12 +572,12 @@ function renderGeologicalLog(pdf, x, y, w, h, geology, well, project) {
   pdf.text('Tabel Lapisan Geologi', x, tableTop);
 
   const colW = [
-    22, // start
-    22, // end
-    22, // tebal
-    40, // material
-    40, // nama
-    w - 22 - 22 - 22 - 40 - 40 - 10, // keterangan
+    20, // start
+    20, // end
+    20, // tebal
+    32, // material
+    36, // nama
+    w - 20 - 20 - 20 - 32 - 36, // keterangan
   ];
   const headers = ['Mulai (m)', 'Akhir (m)', 'Tebal (m)', 'Material', 'Nama Lapisan', 'Keterangan'];
   let ty = tableTop + 8;
@@ -567,9 +607,13 @@ function renderGeologicalLog(pdf, x, y, w, h, geology, well, project) {
     ];
     hx = tableX + 3;
     row.forEach((cell, i) => {
-      pdf.text(cell, hx, ty + rowH/2 + 1.5);
+      const fitted = pdf.splitTextToSize(String(cell), colW[i] - 4)[0] || '';
+      pdf.text(fitted, hx, ty + rowH/2 + 1.5);
       hx += colW[i];
     });
+    pdf.setDrawColor(...PDF_THEME.line);
+    pdf.setLineWidth(0.15);
+    pdf.line(tableX, ty + rowH, tableX + colW.reduce((p, c) => p + c, 0), ty + rowH);
     ty += rowH;
     if (ty > y + h - 6) break;
   }
@@ -598,10 +642,7 @@ function renderGroundwaterMonitoring(pdf, x, y, w, h, monitoring, well, project,
   pdf.rect(x, y, w, h, 'F');
 
   // Title
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(15);
-  pdf.setTextColor(0, 0, 0);
-  pdf.text('MONITORING MUKA AIR TANAH', pageW / 2, y + 12, { align: 'center' });
+  drawPdfTitle(pdf, 'MONITORING MUKA AIR TANAH', pageW / 2, y + 12, { align: 'center', size: 15 });
 
   // Well / project meta
   pdf.setFont('helvetica', 'normal');
@@ -972,22 +1013,18 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
   }
 
   function drawCell(x, y, w, h, opts = {}) {
-    if (opts.fill) {
-      pdf.setFillColor(...opts.fill);
-      pdf.rect(x, y, w, h, 'F');
-    }
-    pdf.setDrawColor(0, 0, 0);
-    pdf.setLineWidth(0.2);
-    pdf.rect(x, y, w, h, 'S');
+    if (opts.fill) { pdf.setFillColor(...opts.fill); pdf.rect(x, y, w, h, 'F'); }
+    pdf.setDrawColor(...PDF_THEME.line); pdf.setLineWidth(0.15); pdf.rect(x, y, w, h, 'S');
   }
 
   function cellText(text, x, y, w, h, opts = {}) {
     const fontSize = opts.fontSize || 8;
     const bold = opts.bold || false;
     const align = opts.align || 'left';
-    const color = opts.color || [0, 0, 0];
+    const color = opts.color || (bold ? PDF_THEME.label : PDF_THEME.ink);
     const paddingX = opts.paddingX !== undefined ? opts.paddingX : 1.5;
     const paddingY = opts.paddingY !== undefined ? opts.paddingY : 1;
+    if (bold && !opts.color) { pdf.setFillColor(...PDF_THEME.labelBg); pdf.rect(x + 0.08, y + 0.08, w - 0.16, h - 0.16, 'F'); }
     pdf.setFontSize(fontSize);
     pdf.setFont('helvetica', bold ? 'bold' : 'normal');
     pdf.setTextColor(...color);
@@ -1004,10 +1041,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
 
   // =========== HALAMAN 1: KONSTRUKSI SUMUR BOR ===========
   let titleY = 20;
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(14);
-  pdf.setTextColor(0, 0, 0);
-  pdf.text('KONSTRUKSI SUMUR BOR', pageW / 2, titleY, { align: 'center' });
+  drawPdfTitle(pdf, 'KONSTRUKSI SUMUR BOR', pageW / 2, titleY, { align: 'center', size: 15 });
 
   const leftLabelW = 32;
   const colonW = 5;
@@ -1142,6 +1176,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
   curY += rowH;
 
   // ===== DUA KOLOM GAMBAR: BOREHOLE (KIRI 30%) DAN KONSTRUKSI (KANAN 70%) =====
+  curY += 3;
   const remainH = pageH - curY - 20;
   const leftColW = tableW * 0.3;
   const rightColW = tableW * 0.7;
@@ -1158,7 +1193,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
 
   const imageStartY = curY + 15;
   const imageWidth = leftColW - 12;
-  const imageHeight = 24;
+  const imageHeight = Math.max(12, Math.min(24, (remainH - 15 - 6) / 5 - 9));
   let imageCurrentY = imageStartY;
 
   // Helper to get depth for borehole image labels from effective model
@@ -1261,7 +1296,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(6);
-    pdf.setTextColor(37, 99, 235);
+    pdf.setTextColor(...PDF_THEME.teal);
 
     const depthText = getBoreholeDepthText(i);
     if (depthText) pdf.text(depthText, imgX, imgY + imgH + 6);
@@ -1304,10 +1339,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
 
   pdf.addPage();
   titleY = 20;
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(14);
-  pdf.setTextColor(0, 0, 0);
-  pdf.text('DATA BOREHOLE CAMERA', pageW / 2, titleY, { align: 'center' });
+  drawPdfTitle(pdf, 'DATA BOREHOLE CAMERA', pageW / 2, titleY, { align: 'center', size: 15 });
 
   const p2LabelW = 48;
   const p2ValW = tableW - p2LabelW;
@@ -1407,8 +1439,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
   // =========== HALAMAN 3 & 4: DOKUMENTASI KEGIATAN BOREHOLE CAMERA ===========
   for (let page = 3; page <= 4; page++) {
     pdf.addPage();
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14); pdf.setTextColor(0, 0, 0);
-    pdf.text('DOKUMENTASI KEGIATAN BOREHOLE CAMERA', pageW / 2, 20, { align: 'center' });
+    drawPdfTitle(pdf, 'DOKUMENTASI KEGIATAN BOREHOLE CAMERA', pageW / 2, 20, { align: 'center', size: 15 });
     let currentY = 35;
     const categoryHeight = 70;
     const categorySpacing = 10;
@@ -1416,7 +1447,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
     const endIdx = page === 3 ? 3 : 6;
     for (let i = startIdx; i <= endIdx; i++) {
       const categoryKey = `doc${i}`;
-      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(37, 99, 235);
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(...PDF_THEME.teal);
       pdf.text(`${i}. ${getDocTitle(i)}`, tableOffsetX, currentY);
       const startX = tableOffsetX;
       const startY = currentY + 5;
@@ -1454,6 +1485,7 @@ export async function downloadBoreholePdf({ model, well, activity, canvas, proje
     }
   }
 
+  finalizePdf(pdf);
   pdf.save('laporan_konstruksi_sumur_bor.pdf');
 }
 
@@ -1512,16 +1544,17 @@ async function generateWellCompletionReport(pdf, {
 
   function drawCell(x, y, w, h, opts = {}) {
     if (opts.fill) { pdf.setFillColor(...opts.fill); pdf.rect(x, y, w, h, 'F'); }
-    pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.2); pdf.rect(x, y, w, h, 'S');
+    pdf.setDrawColor(...PDF_THEME.line); pdf.setLineWidth(0.15); pdf.rect(x, y, w, h, 'S');
   }
 
   function cellText(text, x, y, w, h, opts = {}) {
     const fontSize = opts.fontSize || 8;
     const bold = opts.bold || false;
     const align = opts.align || 'left';
-    const color = opts.color || [0, 0, 0];
+    const color = opts.color || (bold ? PDF_THEME.label : PDF_THEME.ink);
     const paddingX = opts.paddingX !== undefined ? opts.paddingX : 1.5;
     const paddingY = opts.paddingY !== undefined ? opts.paddingY : 1;
+    if (bold && !opts.color) { pdf.setFillColor(...PDF_THEME.labelBg); pdf.rect(x + 0.08, y + 0.08, w - 0.16, h - 0.16, 'F'); }
     pdf.setFontSize(fontSize);
     pdf.setFont('helvetica', bold ? 'bold' : 'normal');
     pdf.setTextColor(...color);
@@ -1536,12 +1569,15 @@ async function generateWellCompletionReport(pdf, {
     pdf.setTextColor(0, 0, 0);
   }
 
-  function addPageIfNeeded(minHeight) {
-    const y = pdf.getY ? pdf.getY() : pdf.lastAutoTable ? pdf.lastAutoTable.finalY : 20;
+  // Mengembalikan posisi Y berikutnya: otomatis pindah halaman bila ruang tidak cukup.
+  function addPageIfNeeded(minHeight, y) {
     if (y + minHeight > pageH - margin) {
       pdf.addPage();
+      return margin;
     }
+    return y;
   }
+
 
   // Prepare data
   const wellDataForAdapter = { model: { ...model, designer } };
@@ -1568,42 +1604,78 @@ async function generateWellCompletionReport(pdf, {
   // A. COVER PAGE
   // ============================================================
   if (sections.cover) {
-    pdf.setFillColor(248, 250, 252);
+    const T = PDF_THEME;
+    pdf.setFillColor(...T.paper);
     pdf.rect(0, 0, pageW, pageH, 'F');
+    // pita vertikal di tepi kiri
+    pdf.setFillColor(...T.teal);
+    pdf.rect(0, 0, 9, pageH, 'F');
+    pdf.setFillColor(...T.ink);
+    pdf.rect(9, 0, 1.2, pageH, 'F');
 
-    // Logo
+    const left = margin + 6;
+    const textW = pageW - left - margin;
+
     if (metadata.logoDataUrl) {
-      try {
-        addImageToPDF(pdf, metadata.logoDataUrl, margin, margin, 40, 40);
-      } catch {}
+      try { addImageToPDF(pdf, metadata.logoDataUrl, left, margin, 32, 32); } catch {}
     }
 
-    // Title
+    // kicker + judul
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(24);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(metadata.title || 'Laporan Penyelesaian Sumur Bor', pageW / 2, pageH / 2 - 40, { align: 'center' });
+    pdf.setFontSize(9);
+    pdf.setTextColor(...T.teal);
+    pdf.text('LAPORAN TEKNIS', left, 98);
+    pdf.setFontSize(28);
+    pdf.setTextColor(...T.ink);
+    const titleLines = pdf.splitTextToSize(metadata.title || 'Laporan Penyelesaian Sumur Bor', textW);
+    titleLines.forEach((line, i) => pdf.text(line, left, 112 + i * 12));
+    const titleEnd = 112 + (titleLines.length - 1) * 12;
+    pdf.setFillColor(...T.teal);
+    pdf.rect(left, titleEnd + 8, 24, 1.4, 'F');
 
-    // Well info
-    pdf.setFont('helvetica', 'normal');
+    // sumur & proyek
+    pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(14);
-    pdf.setTextColor(80, 80, 80);
-    pdf.text(`${well?.wellName || '-'} (${well?.wellCode || '-'})`, pageW / 2, pageH / 2 - 10, { align: 'center' });
+    pdf.setTextColor(...T.ink);
+    pdf.text(`${well?.wellName || '-'}`, left, titleEnd + 24);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10.5);
+    pdf.setTextColor(...T.muted);
+    pdf.text(`Kode sumur ${well?.wellCode || '-'}`, left, titleEnd + 31);
+    pdf.setFontSize(11);
+    pdf.setTextColor(...T.label);
+    const projLines = pdf.splitTextToSize(project?.projectName || '-', textW);
+    projLines.forEach((line, i) => pdf.text(line, left, titleEnd + 43 + i * 5.5));
 
-    // Project info
-    pdf.setFontSize(12);
-    pdf.text(project?.projectName || '-', pageW / 2, pageH / 2 + 15, { align: 'center' });
-
-    // Meta
-    pdf.setFontSize(10);
-    pdf.setTextColor(100, 100, 100);
-    let metaY = pageH / 2 + 40;
-    if (metadata.reportNumber) { pdf.text(`Nomor Laporan: ${metadata.reportNumber}`, pageW / 2, metaY, { align: 'center' }); metaY += 8; }
-    if (metadata.revision) { pdf.text(`Revisi: ${metadata.revision}`, pageW / 2, metaY, { align: 'center' }); metaY += 8; }
-    if (metadata.reportDate) { pdf.text(`Tanggal: ${new Date(metadata.reportDate).toLocaleDateString('id-ID')}`, pageW / 2, metaY, { align: 'center' }); metaY += 8; }
-    if (metadata.preparedBy) { pdf.text(`Disusun oleh: ${metadata.preparedBy}`, pageW / 2, metaY, { align: 'center' }); metaY += 8; }
-    if (metadata.reviewedBy) { pdf.text(`Ditinjau oleh: ${metadata.reviewedBy}`, pageW / 2, metaY, { align: 'center' }); }
-
+    // blok metadata (kisi 2 kolom) di bagian bawah
+    const metaItems = [
+      ['NOMOR LAPORAN', metadata.reportNumber],
+      ['REVISI', metadata.revision],
+      ['TANGGAL', metadata.reportDate ? new Date(metadata.reportDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : ''],
+      ['DISUSUN OLEH', metadata.preparedBy],
+      ['DITINJAU OLEH', metadata.reviewedBy],
+    ].filter(([, v]) => v);
+    if (metaItems.length) {
+      const colW = textW / 2;
+      const rows = Math.ceil(metaItems.length / 2);
+      const top = pageH - margin - rows * 17 - 6;
+      pdf.setDrawColor(...T.line);
+      pdf.setLineWidth(0.3);
+      pdf.line(left, top, left + textW, top);
+      metaItems.forEach(([label, value], idx) => {
+        const cx = left + (idx % 2) * colW;
+        const cy = top + 9 + Math.floor(idx / 2) * 17;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(...T.muted);
+        pdf.text(label, cx, cy);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10.5);
+        pdf.setTextColor(...T.ink);
+        pdf.text(String(value), cx, cy + 5.5);
+      });
+    }
+    pdf.setTextColor(0, 0, 0);
     pdf.addPage();
   }
 
@@ -1612,10 +1684,7 @@ async function generateWellCompletionReport(pdf, {
   // ============================================================
   if (sections.project_well_info) {
     let y = margin;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('INFORMASI PROYEK & SUMUR', margin, y);
+    drawPdfTitle(pdf, 'INFORMASI PROYEK & SUMUR', margin, y, { size: 16 });
     y += 12;
 
     const infoRows = [
@@ -1649,7 +1718,7 @@ async function generateWellCompletionReport(pdf, {
     const labelW = 55;
     infoRows.forEach(([label, value]) => {
       if (!label && !value) { y += 4; return; }
-      addPageIfNeeded(rowH + 2);
+      y = addPageIfNeeded(rowH + 2, y);
       drawCell(margin, y, labelW, rowH, { fill: [240, 240, 245] });
       drawCell(margin + labelW, y, contentW - labelW, rowH);
       cellText(label, margin, y, labelW, rowH, { bold: true, fontSize: 8, vCenter: true });
@@ -1657,7 +1726,6 @@ async function generateWellCompletionReport(pdf, {
       y += rowH;
     });
     y += 8;
-    pdf.setY(y);
     pdf.addPage();
   }
 
@@ -1666,15 +1734,12 @@ async function generateWellCompletionReport(pdf, {
   // ============================================================
   if (sections.well_construction) {
     let y = margin;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('KONSTRUKSI SUMUR', margin, y);
+    drawPdfTitle(pdf, 'KONSTRUKSI SUMUR', margin, y, { size: 16 });
     y += 12;
 
     // Construction diagram
     const diagH = 120;
-    addPageIfNeeded(diagH + 20);
+    y = addPageIfNeeded(diagH + 20, y);
     renderConstructionDiagram(pdf, margin, y, contentW, diagH, legacyModel, extraComponents, groundLevel, matLevel, groundLevelSet, matSet);
     y += diagH + 10;
 
@@ -1739,14 +1804,14 @@ async function generateWellCompletionReport(pdf, {
     });
 
     if (allComponents.length > 0) {
-      addPageIfNeeded(60);
+      y = addPageIfNeeded(60, y);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
       pdf.setTextColor(0, 0, 0);
       pdf.text('Detail Komponen Konstruksi', margin, y);
       y += 8;
 
-      const colW = [60, 20, 25, 25, 25, 25, contentW - 180];
+      const colW = [42, 30, 18, 18, 20, 18, contentW - 146];
       const headers = ['Nama', 'Tipe', 'Mulai (m)', 'Akhir (m)', 'Panjang (m)', 'OD (mm)', 'Material'];
       const rowH = 6;
 
@@ -1761,7 +1826,7 @@ async function generateWellCompletionReport(pdf, {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(6);
       allComponents.forEach(c => {
-        addPageIfNeeded(rowH);
+        y = addPageIfNeeded(rowH, y);
         const row = [
           c.name,
           COMPONENT_LABELS[c.type] || c.type,
@@ -1778,7 +1843,6 @@ async function generateWellCompletionReport(pdf, {
       y += 6;
     }
 
-    pdf.setY(y);
     pdf.addPage();
   }
 
@@ -1793,19 +1857,16 @@ async function generateWellCompletionReport(pdf, {
 
     if (validLayers.length > 0) {
       let y = margin;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(16);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text('LOG GEOLOGI', margin, y);
+      drawPdfTitle(pdf, 'LOG GEOLOGI', margin, y, { size: 16 });
       y += 12;
 
       // Simple text-based geological log for PDF
-      const colW = [25, 25, 25, 40, 40, contentW - 155];
+      const colW = [22, 22, 22, 36, 34, contentW - 136];
       const headers = ['Mulai (m)', 'Akhir (m)', 'Tebal (m)', 'Material', 'Nama Lapisan', 'Keterangan'];
       const rowH = 6;
 
       // Header
-      addPageIfNeeded(rowH * (validLayers.length + 2));
+      y = addPageIfNeeded(rowH * (validLayers.length + 2), y);
       drawCell(margin, y, colW.reduce((a,b)=>a+b,0), rowH, { fill: [30, 41, 59] });
       pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(6);
       let hx = margin + 2;
@@ -1815,7 +1876,7 @@ async function generateWellCompletionReport(pdf, {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(6);
       validLayers.forEach(l => {
-        addPageIfNeeded(rowH);
+        y = addPageIfNeeded(rowH, y);
         const mat = getMaterialForPdf(l.material);
         const row = [
           formatNumber(l.startDepth),
@@ -1830,7 +1891,6 @@ async function generateWellCompletionReport(pdf, {
         y += rowH;
       });
       y += 8;
-      pdf.setY(y);
       pdf.addPage();
     }
   }
@@ -1846,10 +1906,7 @@ async function generateWellCompletionReport(pdf, {
 
     if (validMeasurements.length > 0) {
       let y = margin;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(16);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text('MONITORING MUKA AIR TANAH', margin, y);
+      drawPdfTitle(pdf, 'MONITORING MUKA AIR TANAH', margin, y, { size: 16 });
       y += 12;
 
       // Summary
@@ -1870,7 +1927,7 @@ async function generateWellCompletionReport(pdf, {
       const rowH = 6;
       const labelW = 55;
       statData.forEach(([label, value]) => {
-        addPageIfNeeded(rowH);
+        y = addPageIfNeeded(rowH, y);
         drawCell(margin, y, labelW, rowH, { fill: [240, 240, 245] });
         drawCell(margin + labelW, y, contentW - labelW, rowH);
         cellText(label, margin, y, labelW, rowH, { bold: true, fontSize: 8, vCenter: true });
@@ -1880,14 +1937,14 @@ async function generateWellCompletionReport(pdf, {
       y += 8;
 
       // Measurements table
-      addPageIfNeeded(60);
+      y = addPageIfNeeded(60, y);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
       pdf.setTextColor(0, 0, 0);
       pdf.text('Riwayat Pengukuran', margin, y);
       y += 8;
 
-      const colW = [35, 25, 25, 30, 25, contentW - 140];
+      const colW = [34, 24, 24, 28, 24, contentW - 134];
       const headers = ['Tanggal & Waktu', 'Kedalaman (m)', 'Perubahan (m)', 'Titik Referensi', 'Metode', 'Catatan'];
       const rowH2 = 5;
 
@@ -1900,7 +1957,7 @@ async function generateWellCompletionReport(pdf, {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(5.5);
       validMeasurements.forEach((m, i) => {
-        addPageIfNeeded(rowH2);
+        y = addPageIfNeeded(rowH2, y);
         const prev = i > 0 ? validMeasurements[i - 1] : null;
         const rowChange = prev && prev.referencePoint === m.referencePoint
           ? m.waterLevelDepth - prev.waterLevelDepth
@@ -1921,7 +1978,6 @@ async function generateWellCompletionReport(pdf, {
         y += rowH2;
       });
       y += 8;
-      pdf.setY(y);
       pdf.addPage();
     }
   }
@@ -1931,10 +1987,7 @@ async function generateWellCompletionReport(pdf, {
   // ============================================================
   if (sections.field_documentation && selectedPhotoIds?.length > 0) {
     let y = margin;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('DOKUMENTASI LAPANGAN', margin, y);
+    drawPdfTitle(pdf, 'DOKUMENTASI LAPANGAN', margin, y, { size: 16 });
     y += 12;
 
     // We need to get the actual photo records - for now use activity images as fallback
@@ -1963,7 +2016,6 @@ async function generateWellCompletionReport(pdf, {
     }
 
     y += 8;
-    pdf.setY(y);
     pdf.addPage();
   }
 
@@ -1972,10 +2024,7 @@ async function generateWellCompletionReport(pdf, {
   // ============================================================
   if (sections.notes_conclusion) {
     let y = margin;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('CATATAN & KESIMPULAN', margin, y);
+    drawPdfTitle(pdf, 'CATATAN & KESIMPULAN', margin, y, { size: 16 });
     y += 12;
 
     if (notes.technical) {
@@ -1989,7 +2038,7 @@ async function generateWellCompletionReport(pdf, {
       pdf.setTextColor(30, 30, 30);
       const techLines = pdf.splitTextToSize(notes.technical, contentW);
       techLines.forEach(line => {
-        addPageIfNeeded(5);
+        y = addPageIfNeeded(5, y);
         pdf.text(line, margin, y);
         y += 5;
       });
@@ -1997,7 +2046,7 @@ async function generateWellCompletionReport(pdf, {
     }
 
     if (notes.conclusion) {
-      addPageIfNeeded(30);
+      y = addPageIfNeeded(30, y);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
       pdf.setTextColor(0, 0, 0);
@@ -2008,7 +2057,7 @@ async function generateWellCompletionReport(pdf, {
       pdf.setTextColor(30, 30, 30);
       const concLines = pdf.splitTextToSize(notes.conclusion, contentW);
       concLines.forEach(line => {
-        addPageIfNeeded(5);
+        y = addPageIfNeeded(5, y);
         pdf.text(line, margin, y);
         y += 5;
       });
@@ -2016,7 +2065,7 @@ async function generateWellCompletionReport(pdf, {
     }
 
     // Signatures
-    addPageIfNeeded(40);
+    y = addPageIfNeeded(40, y);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
     pdf.setTextColor(0, 0, 0);
@@ -2036,5 +2085,6 @@ async function generateWellCompletionReport(pdf, {
 
   // Save
   const fileName = `laporan_penyelesaian_${well?.wellCode || 'sumur'}_${new Date().toISOString().split('T')[0]}.pdf`;
+  finalizePdf(pdf, { skipFirst: !!sections.cover });
   pdf.save(fileName);
 }

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState, useContext, isValidElement } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useContext, isValidElement } from 'react';
+import { createPortal } from 'react-dom';
 import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, CircleX, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react';
 
 /* ---------- Button ---------- */
@@ -51,106 +52,128 @@ const parseISO = (v) => {
 };
 
 function DateField({ value, onChange, name, disabled, required, className, placeholder, ...rest }) {
-  const [sheet, setSheet] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+  const mqSheet = '(max-width: 640px), (pointer: coarse) and (max-width: 820px)';
+  const [sheet, setSheet] = useState(() => typeof window !== 'undefined' && window.matchMedia(mqSheet).matches);
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 640px)');
+    const mq = window.matchMedia(mqSheet);
     const on = () => setSheet(mq.matches);
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
   const selected = parseISO(value);
   const [view, setView] = useState(() => selected || new Date());
-  const rootRef = useRef(null);
   const btnRef = useRef(null);
   const popRef = useRef(null);
 
-  const place = useCallback(() => {
-    const btn = btnRef.current; const root = rootRef.current;
-    if (!btn || !root) return;
-    if (sheet) { root.dataset.flip = 'sheet'; return; }
-    const r = btn.getBoundingClientRect();
-    const W = 316;
+  // Hitung posisi sebelum paint; popover memakai portal sehingga tidak terpotong modal.
+  useLayoutEffect(() => {
+    if (!open || sheet) { setPos(null); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const W = Math.min(316, window.innerWidth - 24);
     const left = Math.min(Math.max(12, r.left), window.innerWidth - W - 12);
     const below = window.innerHeight - r.bottom;
-    root.style.setProperty('--dx', `${left}px`);
-    if (below < 440 && r.top > below) {
-      root.style.setProperty('--dy', 'auto'); root.style.setProperty('--db', `${window.innerHeight - r.top + 8}px`); root.dataset.flip = 'up';
-    } else {
-      root.style.setProperty('--dy', `${r.bottom + 8}px`); root.style.setProperty('--db', 'auto'); root.dataset.flip = 'down';
-    }
-  }, [sheet]);
+    const up = below < 400 && r.top > below;
+    setPos(up
+      ? { left, width: W, bottom: window.innerHeight - r.top + 8, up: true }
+      : { left, width: W, top: r.bottom + 8, up: false });
+  }, [open, sheet]);
 
   useEffect(() => {
     if (!open) return undefined;
-    place();
-    const down = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); };
+    const down = (e) => {
+      if (popRef.current?.contains(e.target) || btnRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
     const key = (e) => { if (e.key === 'Escape') { setOpen(false); btnRef.current?.focus(); } };
-    const scroll = (e) => { if (!sheet && !popRef.current?.contains(e.target)) setOpen(false); };
-    const resize = () => { if (sheet) place(); else setOpen(false); };
+    const close = (e) => { if (!popRef.current?.contains(e.target)) setOpen(false); };
     document.addEventListener('pointerdown', down);
     document.addEventListener('keydown', key);
-    window.addEventListener('resize', resize);
-    window.addEventListener('scroll', scroll, { passive: true, capture: true });
+    if (!sheet) {
+      window.addEventListener('resize', close);
+      window.addEventListener('scroll', close, { passive: true, capture: true });
+    }
     const prevOverflow = document.body.style.overflow;
     if (sheet) document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('pointerdown', down);
       document.removeEventListener('keydown', key);
-      window.removeEventListener('resize', resize);
-      window.removeEventListener('scroll', scroll, { capture: true });
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, { capture: true });
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, place, sheet]);
+  }, [open, sheet]);
 
   const emit = (v) => onChange && onChange({ target: { value: v, name } });
   const pick = (d) => { emit(toISO(d)); setOpen(false); btnRef.current?.focus(); };
-  const y = view.getFullYear(); const m = view.getMonth();
-  const first = new Date(y, m, 1);
-  const offset = (first.getDay() + 6) % 7; // Senin = 0
-  const cells = Array.from({ length: 42 }, (_, i) => new Date(y, m, 1 - offset + i));
-  const today = new Date();
-  const same = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  const shift = (n) => setView(new Date(y, m + n, 1));
   const label = selected ? `${pad(selected.getDate())} ${BULAN[selected.getMonth()].slice(0, 3)} ${selected.getFullYear()}` : null;
 
   return (
-    <span className={`datefield ${open ? 'is-open' : ''} ${sheet ? 'is-sheet' : ''}`} ref={rootRef}>
+    <span className={`datefield ${open ? 'is-open' : ''}`}>
       <button
         ref={btnRef} type="button" disabled={disabled}
         className={`field-input date-trigger ${label ? '' : 'is-empty'}`}
         aria-haspopup="dialog" aria-expanded={open}
-        onClick={(e) => { e.preventDefault(); if (!open && selected) setView(selected); setOpen((v) => !v); }}
+        onClick={(e) => { e.preventDefault(); if (!open) setView(selected || new Date()); setOpen((v) => !v); }}
       >
         <span>{label || placeholder || 'Pilih tanggal'}</span>
         <CalendarDays size={17} strokeWidth={1.8} />
       </button>
-      <div className="datepop-backdrop" onClick={(e) => { e.preventDefault(); setOpen(false); }} aria-hidden="true" />
-      <div className="datepop" ref={popRef} onClick={(e) => e.preventDefault()} role="dialog" aria-modal={sheet || undefined} aria-label="Pilih tanggal" aria-hidden={!open}>
-        <span className="datepop-grab" aria-hidden="true" />
-        <div className="datepop-head">
+      {open && (sheet || pos) && createPortal(
+        <DatePopover
+          popRef={popRef} sheet={sheet} pos={pos} view={view} setView={setView}
+          selected={selected} required={required} onPick={pick}
+          onClear={() => { emit(''); setOpen(false); }} onClose={() => setOpen(false)}
+        />,
+        document.body,
+      )}
+    </span>
+  );
+}
+
+function DatePopover({ popRef, sheet, pos, view, setView, selected, required, onPick, onClear, onClose }) {
+  const y = view.getFullYear(); const m = view.getMonth();
+  const offset = (new Date(y, m, 1).getDay() + 6) % 7; // Senin = 0
+  const today = new Date();
+  const same = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const shift = (n) => setView(new Date(y, m + n, 1));
+  const cells = [];
+  for (let i = 0; i < 42; i += 1) cells.push(new Date(y, m, 1 - offset + i));
+  const style = sheet ? undefined : { left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom };
+
+  return (
+    <div className={`dp-layer ${sheet ? 'is-sheet' : ''}`}>
+      {sheet && <div className="dp-backdrop" onClick={onClose} aria-hidden="true" />}
+      <div
+        ref={popRef} className={`dp-pop ${!sheet && pos?.up ? 'is-up' : ''}`} style={style}
+        role="dialog" aria-modal={sheet || undefined} aria-label="Pilih tanggal"
+      >
+        {sheet && <span className="dp-grab" aria-hidden="true" />}
+        <div className="dp-head">
           <strong>{BULAN[m]} {y}</strong>
           <span>
-            <button type="button" className="icon-btn" aria-label="Bulan sebelumnya" onClick={() => shift(-1)}><ChevronLeft size={18} /></button>
-            <button type="button" className="icon-btn" aria-label="Bulan berikutnya" onClick={() => shift(1)}><ChevronRight size={18} /></button>
+            <button type="button" className="dp-nav" aria-label="Bulan sebelumnya" onClick={() => shift(-1)}><ChevronLeft size={18} /></button>
+            <button type="button" className="dp-nav" aria-label="Bulan berikutnya" onClick={() => shift(1)}><ChevronRight size={18} /></button>
           </span>
         </div>
-        <div className="datepop-grid">
-          {HARI.map((h) => <i key={h} className="dow">{h}</i>)}
+        <div className="dp-grid">
+          {HARI.map((h) => <i key={h} className="dp-dow">{h}</i>)}
           {cells.map((d) => (
             <button
-              key={d.getTime()} type="button" tabIndex={open ? 0 : -1}
-              className={`day ${d.getMonth() !== m ? 'is-out' : ''} ${same(d, today) ? 'is-today' : ''} ${same(d, selected) ? 'is-selected' : ''}`}
-              onClick={() => pick(d)}
+              key={d.getTime()} type="button"
+              className={`dp-day ${d.getMonth() !== m ? 'is-out' : ''} ${same(d, today) ? 'is-today' : ''} ${same(d, selected) ? 'is-selected' : ''}`}
+              onClick={() => onPick(d)}
             >{d.getDate()}</button>
           ))}
         </div>
-        <div className="datepop-foot">
-          {!required && <button type="button" onClick={() => { emit(''); setOpen(false); }}>Hapus</button>}
-          <button type="button" onClick={() => pick(new Date())}>Hari ini</button>
+        <div className="dp-foot">
+          {!required && <button type="button" onClick={onClear}>Hapus</button>}
+          <button type="button" onClick={() => onPick(new Date())}>Hari ini</button>
         </div>
       </div>
-    </span>
+    </div>
   );
 }
 

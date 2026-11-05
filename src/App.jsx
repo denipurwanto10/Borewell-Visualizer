@@ -24,9 +24,11 @@ import RejectedAccountPage from './components/auth/RejectedAccountPage';
 import SuspendedAccountPage from './components/auth/SuspendedAccountPage';
 import AdminApprovalPage from './components/auth/AdminApprovalPage';
 import AppShell from './components/layout/AppShell';
+import { PAGE_HASH_MAP } from './components/layout/navConfig';
 import AuthLayout from './components/layout/AuthLayout';
 import { downloadBoreholePdf } from './pdf';
 import { INITIAL_WELL, EMPTY_MODEL, makeEmptyActivity } from './model';
+import { isValidBackendId } from './utils/ids';
 import logo from '../img/tubes.png';
 
 const RAIL_QUERY = '(min-width: 1100px) and (max-width: 1279px)';
@@ -144,7 +146,7 @@ export default function App() {
     // Note: activeWellId is intentionally NOT a dependency — when the user switches wells,
     // the load effect above replaces model/well/activity first, then this effect persists
     // the new well's data (never the previous well's data).
-    if (activeWellId && wellHydrated) {
+    if (activeWellId && wellHydrated && (!isAuthenticated || isValidBackendId(activeWellId))) {
       saveActiveWellData({
         model: current.model,
         well: current.well,
@@ -226,6 +228,43 @@ export default function App() {
     return () => window.removeEventListener('popstate', syncFromUrl);
   }, []);
 
+  // Sync in-app navigation with URL hash used by all pages.
+  useEffect(() => {
+    const syncFromHash = () => {
+      const h = (window.location.hash || '').replace(/^#/, '');
+
+      // Handle project detail route
+      const projectMatch = h.match(/^\/?project\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+      if (projectMatch) {
+        const id = projectMatch[1];
+        setSelectedProjectId(id);
+        setViewMode('detail');
+        selectProject(id);
+        setPage((prev) => (prev !== 'projects' ? 'projects' : prev));
+        return;
+      }
+
+      // Handle all other routes via hash map
+      const matchedPage = Object.entries(PAGE_HASH_MAP).find(([, hash]) => hash === h || hash === '/' + h);
+      if (matchedPage) {
+        const [pageId] = matchedPage;
+        if (pageId === 'projects') {
+          setViewMode('list');
+          setSelectedProjectId(null);
+        }
+        setPage((prev) => (prev !== pageId ? pageId : prev));
+        return;
+      }
+
+      // Default to dashboard for empty hash
+      if (!h || h === '/') {
+        setPage((prev) => (prev !== 'dashboard' ? 'dashboard' : prev));
+      }
+    };
+    window.addEventListener('hashchange', syncFromHash);
+    syncFromHash();
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, [selectProject]);
   if (authLoading) {
     return (
       <div className="app loading">
@@ -244,6 +283,13 @@ export default function App() {
     if (id === 'projects') {
       setViewMode('list');
       setSelectedProjectId(null);
+    }
+    // Update URL hash for browser history and refresh support
+    const hash = PAGE_HASH_MAP[id];
+    if (hash && hash !== '/') {
+      window.location.hash = hash;
+    } else if (hash === '/') {
+      window.location.hash = '';
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -310,6 +356,8 @@ export default function App() {
     setSelectedProjectId(projectId);
     setViewMode('detail');
     selectProject(projectId);
+    // Update URL hash for browser history and refresh support
+    window.location.hash = `/project/${projectId}`;
   };
 
   const handleWellSelect = (wellId) => {
@@ -398,7 +446,7 @@ export default function App() {
         {activeProjectId ? (
           <ProjectDocumentationPage notify={projectNotify} />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <FileText size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada proyek aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat proyek dari halaman Proyek untuk mengelola dokumentasi proyek.</p>
@@ -407,19 +455,23 @@ export default function App() {
         )}
       </div>
 
-      {viewMode === 'list' && displayPage === 'projects' && (
-        <ProjectsPage />
+      {page === 'projects' && viewMode === 'list' && (
+        <div className="page is-active" id="projects">
+          <ProjectsPage />
+        </div>
       )}
 
-      {viewMode === 'detail' && selectedProjectId && (
-        <ProjectDetailPage projectId={selectedProjectId} />
+      {page === 'projects' && viewMode === 'detail' && selectedProjectId && (
+        <div className="page is-active" id="project-detail">
+          <ProjectDetailPage projectId={selectedProjectId} />
+        </div>
       )}
 
       <div className={`page ${page === 'visualisasi' ? 'is-active' : ''}`} id="visualisasi">
         {activeWellId ? (
           <VisualizationPage model={model} setModel={setModel} canvasRef={canvasRef} notify={projectNotify} />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <Ruler size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai visualisasi.</p>
@@ -432,7 +484,7 @@ export default function App() {
         {activeWellId ? (
           <DesignerPage notify={projectNotify} />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <RotateCcw size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai desain konstruksi.</p>
@@ -445,7 +497,7 @@ export default function App() {
         {activeWellId ? (
           <DataPage well={well} setWell={setWell} notify={projectNotify} onSave={() => saveWellData('Data sumur bor berhasil disimpan.')} onReset={resetWell} />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <ClipboardList size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk mengisi data.</p>
@@ -458,7 +510,7 @@ export default function App() {
         {activeWellId ? (
           <DocsPage activity={activity} setActivity={setActivity} notify={projectNotify} onSave={() => saveWellData('Dokumentasi kegiatan berhasil disimpan.')} onReset={resetActivity} />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <Images size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk menambah dokumentasi.</p>
@@ -471,7 +523,7 @@ export default function App() {
         {activeWellId ? (
           <DocumentationPage notify={projectNotify} />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <FileText size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk mengelola galeri foto dan dokumen.</p>
@@ -484,7 +536,7 @@ export default function App() {
         {activeWellId ? (
           <GeologyPage />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <Layers size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai log geologi.</p>
@@ -497,7 +549,7 @@ export default function App() {
         {activeWellId ? (
           <MonitoringPage />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <Droplets size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk memulai monitoring air tanah.</p>
@@ -510,7 +562,7 @@ export default function App() {
         {activeWellId ? (
           <ReportBuilderPage notify={projectNotify} />
         ) : (
-          <div className="empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div className="empty-state page-empty">
             <Download size={64} style={{ color: 'var(--mute-2)', margin: '0 auto 16px' }} />
             <h3>Belum ada sumur aktif</h3>
             <p style={{ color: 'var(--mute)', marginBottom: '20px' }}>Pilih atau buat sumur dari halaman Proyek untuk membuat laporan penyelesaian.</p>
