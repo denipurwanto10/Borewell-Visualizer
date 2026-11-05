@@ -5,3 +5,16 @@ dist/
 .env.*
 login.json
 backups/
+
+# local secrets and scratch files
+cookies.txt
+test_login.json
+backend/hash.txt
+backend/temp_up.sql
+fix_passwords.sql
+setup_test_db.sql
+
+# test artifacts
+playwright-report/
+test-results/
+screenshots/
