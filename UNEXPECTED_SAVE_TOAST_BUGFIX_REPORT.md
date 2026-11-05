@@ -1,96 +1,81 @@
-# Unexpected "Gagal menyimpan data" Toast — Bug Fix Report
+# Unexpected "Gagal menyimpan data" Toast — Bug Fix Report (HTTP 400)
 
-## Summary
-Fixed a bug where the error toast "Gagal menyimpan data. Coba lagi." appeared unexpectedly on:
-- Page refresh (while authenticated)
-- Immediately after successful login
-- Without any user-initiated save action
+## 1. Actual Root Cause
 
-## Root Causes (Two Issues)
+Authenticated API requests were being made with legacy/offline-generated identifiers instead of backend UUIDs.
 
-### Issue 1: Autosave Race Condition (Fixed in commit `e7c0db0`)
-**File:** `src/App.jsx` — autosave effect
+- Offline/legacy storage generates ids such as `well-179367347637-abc` and `proj-...`.
+- In authenticated mode, `loadProjectsFromAPI()` copied the stale localStorage active well id directly into React state:
+  `setActiveWellIdState(lsGetActiveWellId())`.
+- That generated id is not a valid UUID, so every API call using it (`GET /api/v1/wells/{id}`, `PUT /api/v1/wells/{id}`, and module upserts) failed with HTTP 400 "Invalid well ID".
+- Multiple mounted pages (`DesignerPage`, `GeologyPage`, `MonitoringPage`, `DocumentationPage`) each called `loadActiveWellData()` with the same invalid id, producing repeated 400 requests.
+- The failed save path then triggered the toast "Gagal menyimpan data. Coba lagi."
 
-The autosave `useEffect` fired on initial render with empty/default data before `loadActiveWellData()` could hydrate real data from the API.
+This is not an initialization race or a snake_case/camelCase conversion issue. The previous fixes did not address stale cross-mode identifiers.
 
-### Issue 2: Snake_case / camelCase Mismatch (Fixed in this commit)
-**File:** `src/context/ProjectContext.jsx` — `loadActiveWellData()` function
+## 2. Evidence
 
-The `loadActiveWellData()` function returned raw API data (snake_case: `well_name`, `well_type`, `planned_depth`, etc.) but `saveActiveWellData()` expects camelCase (`wellName`, `wellType`, `plannedDepth`, etc.). When autosave ran after hydration, it sent `undefined` values for all well fields, causing the backend to reject the request with a 400 validation error.
+- Request names in Chrome DevTools began with `well-179367347637-...`, matching the generated id format in `src/models/project.js` (`well-${Date.now()}-${...}`).
+- Backend `WellHandler.UpdateWell` and module handlers call `uuid.Parse(c.Param("id"))`; an invalid id returns HTTP 400 before any validation or database access.
+- `src/context/ProjectContext.jsx` previously set `activeWellId` from `lsGetActiveWellId()` in API mode.
+- `lsSetActiveWellId` is not used by normal authenticated flows, so localStorage active well ids could only be stale legacy/offline values.
 
-### Issue 3: Un-awaited Async Calls in Page Components
-**Files:** `src/components/DesignerPage.jsx`, `src/components/GeologyPage.jsx`, `src/components/MonitoringPage.jsx`
+## 3. Files Changed
 
-These pages called `loadActiveWellData()` without `await`, receiving a Promise instead of resolved data. This prevented proper data loading (though didn't directly cause the toast).
+- `src/utils/ids.js` (new): `isValidBackendId()` UUID validator.
+- `src/utils/ids.test.js` (new): regression tests for the validator.
+- `src/context/ProjectContext.jsx`:
+  - Import `isValidBackendId`.
+  - In `loadProjectsFromAPI()`, stop copying stale localStorage well ids; reset active well to `null` and clear stale localStorage UI state.
+  - Guard `saveActiveWellData()`, `loadActiveWellData()`, and `getWellData()` against invalid backend ids.
+- `src/App.jsx`:
+  - Import `isValidBackendId`.
+  - Guard the autosave effect so it never runs with an invalid authenticated well id.
+- `UNEXPECTED_SAVE_TOAST_BUGFIX_REPORT.md`: this report.
 
-## Fix Applied
+## 4. Explanation of the Fix
 
-### 1. Hydration Guard (commit `e7c0db0`)
-**File:** `src/App.jsx`
-- Added `wellHydrated` state to track when initial well data has loaded
-- Guarded autosave with `activeWellId && wellHydrated`
-- Fixed async loading with proper `await` and cleanup
+- Authenticated mode no longer trusts localStorage for the active well id.
+- Any generated/offline id is rejected before an API request is attempted.
+- Invalid ids reset the active well to `null`, preventing retry loops and repeated 400 responses.
+- Backend validation and security are unchanged.
+- The toast is still shown for genuine save failures.
 
-### 2. Well Data Normalization (this commit)
-**File:** `src/context/ProjectContext.jsx`
-- Added normalization in `loadActiveWellData()` to convert API snake_case to frontend camelCase
-- Maps: `well_code` → `wellCode`, `well_name` → `wellName`, `well_type` → `wellType`, `planned_depth` → `plannedDepth`, etc.
+## 5. Tests Added or Modified
 
-### 3. Fixed Async/Await in Page Components (this commit)
-**Files:** `src/components/DesignerPage.jsx`, `src/components/GeologyPage.jsx`, `src/components/MonitoringPage.jsx`
-- Changed load effects to properly `await loadActiveWellData()`
-- Added cleanup functions to handle well switching
+- `src/utils/ids.test.js`: valid UUIDs accepted; generated offline ids and invalid values rejected.
+- Existing frontend tests remain passing (79 tests).
+- Backend `go vet ./...` and `go test ./...` pass.
 
-## Verification
+## 6. Test and Build Results
 
-### Build
-```bash
-npm run build
-# ✓ built in 29.60s
-```
+- Frontend: `npm test` — 5 test files, 79 tests passed.
+- Frontend build: `npm run build` — succeeded.
+- Backend: `go vet ./...` — no issues.
+- Backend: `go test ./...` — all packages ok.
 
-### Frontend Tests (Vitest)
-```bash
-npm test
-# 4 test files, 76 tests passed
-```
+## 7. Browser Verification
 
-### Backend Tests (Go)
-```bash
-go test ./...
-# All packages ok
-```
+Performed against local dev server (`http://localhost:5173`) with backend (`http://localhost:8080`):
 
-### Static Analysis
-```bash
-go vet ./...
-# No issues
-```
+- Logged in as `admin@local`.
+- Injected a stale localStorage active well id (`well-179367347637-abc`).
+- Reloaded and checked Network: 0 HTTP 400 requests.
+- Repeated refresh: 0 HTTP 400 requests.
+- Full legitimate edit/save persistence was not exercised in-browser; code path remains unchanged for valid UUID well ids and is covered by existing save flow.
 
-## Regression Test Scenarios
+## 8. Remaining Risks or Limitations
 
-| Scenario | Before Fix | After Fix |
-|----------|------------|-----------|
-| Open login page | No toast | No toast |
-| Successful login | ❌ Toast appeared | ✅ No toast |
-| Refresh while authenticated | ❌ Toast appeared | ✅ No toast |
-| Initial project hydration | ❌ Premature save | ✅ No premature save |
-| Initial well hydration | ❌ Premature save | ✅ No premature save |
-| Change selected project | ❌ Stale-project save possible | ✅ Hydration resets |
-| Change selected well | ❌ Stale-well save possible | ✅ Hydration resets |
-| Actual successful save | ✅ Works | ✅ Works |
-| Actual failed save | ✅ Error shown | ✅ Error shown |
-| Expired session | ✅ Auth handles | ✅ Auth handles |
-| Logout | ✅ No background save | ✅ No background save |
+- Users with stale localStorage project/well ids lose the previously selected active well after refresh and must reselect it. This is expected because authenticated selection was never persisted.
+- The frontend still autosaves on model/well/activity changes for valid wells; this is intended behavior.
+- If a backend record is deleted while selected, the next load/save will fail and show the toast as intended.
 
-## Files Changed
-- `src/App.jsx` — Added hydration guard and fixed async loading in autosave lifecycle (commit `e7c0db0`)
-- `src/context/ProjectContext.jsx` — Normalize well data from API snake_case to camelCase
-- `src/components/DesignerPage.jsx` — Properly await `loadActiveWellData()` with cleanup
-- `src/components/GeologyPage.jsx` — Properly await `loadActiveWellData()` with cleanup
-- `src/components/MonitoringPage.jsx` — Properly await `loadActiveWellData()` with cleanup
+## 9. Manual Verification Steps
 
-## Remaining Limitations
-- The autosave still runs on every `model`/`well`/`activity` change after hydration. This is intentional for real-time persistence.
-- If the API returns 401/403 during autosave, the global auth interceptor handles token refresh; repeated failures will eventually log the user out.
-- No deduplication of rapid successive saves — acceptable for current UX.
+1. Clear or inject stale `borewell-projects:v1` activeWellId.
+2. Open the application and log in.
+3. Wait for project and well data to load.
+4. Confirm no HTTP 400 requests in Network.
+5. Refresh and confirm again.
+6. Create/select a valid well, edit data, and save.
+7. Refresh and verify persistence.
