@@ -20,6 +20,27 @@ import {
 } from '../storage/documentationStorage';
 import { fileAPI } from '../api/client';
 
+// Ubah foto dokumentasi menjadi data URL agar bisa disematkan ke PDF.
+async function resolvePhotoDataUrl(photo, previewUrls) {
+  try {
+    let ref = photo.fileRef;
+    if (ref && ref.startsWith('indexeddb:')) ref = await retrieveFile(ref);
+    if (ref && ref.startsWith('data:')) return ref;
+    const url = previewUrls[photo.id] || (ref && /^(blob:|https?:)/.test(ref) ? ref : null);
+    if (!url) return null;
+    const blob = await (await fetch(url)).blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Gagal memuat foto untuk PDF', photo.id, e);
+    return null;
+  }
+}
+
 const SECTION_DEFAULTS = REPORT_SECTIONS.reduce((acc, s) => ({ ...acc, [s.id]: s.default }), {});
 
 function SectionToggle({ section, enabled, onToggle, photoCount, docCount, disabled }) {
@@ -44,7 +65,7 @@ function SectionToggle({ section, enabled, onToggle, photoCount, docCount, disab
   );
 }
 
-function PhotoSelector({ photos, selectedIds, onToggle, onSelectAll, onClear, maxPreview = 20 }) {
+function PhotoSelector({ photos, selectedIds, onToggle, onSelectAll, onClear, maxPreview = 20, previewUrls = {} }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -258,6 +279,12 @@ export default function ReportBuilderPage({ notify }) {
     try {
       const wellDataForPdf = wellData || loadActiveWellData();
       const selectedPhotoRecords = photos.filter(p => selectedPhotos.has(p.id));
+      const photoRecords = sections.field_documentation
+        ? (await Promise.all(selectedPhotoRecords.map(async (p) => ({
+            id: p.id, name: p.name, category: p.category, description: p.description,
+            documentedAt: p.documentedAt, dataUrl: await resolvePhotoDataUrl(p, previewUrls),
+          })))).filter(p => p.dataUrl)
+        : [];
 
       await downloadBoreholePdf({
         model: wellDataForPdf?.model || {},
@@ -267,10 +294,12 @@ export default function ReportBuilderPage({ notify }) {
         project: activeProject,
         designer,
         geology,
+        monitoring,
         // Pass report configuration via a custom property
         _reportConfig: {
           sections,
           selectedPhotoIds: Array.from(selectedPhotos),
+          photoRecords,
           metadata,
           notes,
         },
@@ -382,6 +411,7 @@ export default function ReportBuilderPage({ notify }) {
 
           <section className="config-panel">
             <PhotoSelector
+              previewUrls={previewUrls}
               photos={photos}
               selectedIds={selectedPhotos}
               onToggle={handlePhotoToggle}

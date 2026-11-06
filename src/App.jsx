@@ -342,7 +342,8 @@ export default function App() {
       // Pass designer state from storage (includes autosaved changes)
       const designer = wellData?.model?.designer || null;
       const geology = wellData?.model?.geologicalLog || null;
-      await downloadBoreholePdf({ model, well, activity, canvas: canvasRef.current, project: activeProject, designer, geology });
+      const monitoring = wellData?.model?.groundwaterMonitoring || null;
+      await downloadBoreholePdf({ model, well, activity, canvas: canvasRef.current, project: activeProject, designer, geology, monitoring });
       projectNotify('PDF berhasil diunduh.', 'success');
     } catch (error) {
       console.error(error);
