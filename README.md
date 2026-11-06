@@ -17,6 +17,9 @@ Interactive web application for visualizing and documenting borehole constructio
 - Undo/redo history (max 50) with keyboard shortcuts
 - Autosave (1.5s debounce)
 - Export canvas as PNG
+- Responsive canvas (240–700 px wide) with ruler and label columns that reflow on narrow screens
+- Collision-free component labels: stacked with a minimum gap, elbow leader lines, and ellipsis fitting
+- Properties panel: auto-computed interval length, native color picker + hex input, numeric fields kept as numbers
 
 ### Geological Log
 - Multiple layers with material, depth, description, formation
@@ -77,7 +80,7 @@ Interactive web application for visualizing and documenting borehole constructio
 | Backend | Go 1.22 + Gin |
 | Database | PostgreSQL 15+ |
 | Auth | JWT (15min access, 30d refresh in HttpOnly cookie), Argon2id |
-| Migrations | 13 SQL migrations (users, projects, wells, files, RLS, triggers, indexes) |
+| Migrations | 16 SQL migrations (users, projects, wells, files, RLS, triggers, indexes, project_assignments) |
 | Security | Row Level Security (project/well isolation, fail-closed), CSRF, Rate limiting |
 
 ## Architecture
@@ -129,7 +132,7 @@ The application runs in two modes:
 - **Middleware** — request ID, CORS allow-list, CSRF check on state-changing methods, JWT validation, and per-IP rate limiting run before any handler.
 - **Data access** — handlers delegate to services, services to repositories. Every query runs inside PostgreSQL with RLS policies scoped to the active user's project and well.
 - **File storage** — the documentation service writes to `FILE_STORAGE_PATH`, validates MIME type and size, and stores a SHA-256 checksum for deduplication.
-- **Operations** — `cmd/migrate` applies the 13 versioned migrations, `cmd/bootstrap-admin` seeds the first approved administrator, and Docker only hosts the local PostgreSQL container.
+- **Operations** — `cmd/migrate` applies the versioned migrations, `cmd/bootstrap-admin` seeds the first approved administrator, and Docker only hosts the local PostgreSQL container.
 
 ## Quick Start
 
@@ -150,14 +153,15 @@ npm run preview      # Preview production build
 cd backend
 cp .env.example .env
 # Edit .env with DATABASE_URL, JWT_SECRET, REFRESH_TOKEN_SECRET, etc.
-docker run --name postgres-borewell \
-  -e POSTGRES_DB=borewell \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=password \
-  -p 5432:5432 -d postgres:15
-./bin/migrate up
-./bin/bootstrap-admin -email admin@example.com -password "StrongPassword123"
-./bin/server
+docker compose up -d postgres
+
+# Either run straight from source (recommended) …
+go run ./cmd/migrate up
+go run ./cmd/bootstrap-admin --email admin@example.com --password "StrongPassword123"
+go run ./cmd/server
+
+# … or build local binaries (git-ignored) once:
+# go build -o bin/migrate.exe ./cmd/migrate && go build -o bin/server.exe ./cmd/server
 ```
 
 **Frontend Setup:**
@@ -169,17 +173,23 @@ npm run dev          # Proxies /api to backend at http://127.0.0.1:8080
 ## Testing
 
 ```bash
-# Frontend verification scripts
+# Frontend unit / integration tests (Vitest + Testing Library)
+npm test
+
+# End-to-end tests (Playwright)
+npx playwright test
+
+# Backend tests (auth, RLS, security, refresh tokens, admin & assignments)
+cd backend
+go test ./...
+
+# Legacy browser verification scripts
 node tests/phase2_verify.mjs   # Project & Well Management
 node tests/phase3_verify.mjs   # Advanced Well Designer
 node tests/phase4_verify.mjs   # Geological Log
 node tests/phase5_verify.mjs   # Groundwater Monitoring
 node tests/phase7_verify.mjs   # Data Management, Backup & Restore
 node tests/pdf_verify.mjs      # PDF Generation
-
-# Backend tests
-cd backend
-go test ./...                  # Auth, RLS, Security, Refresh tokens, FS3
 ```
 
 ## Storage Architecture
@@ -233,35 +243,35 @@ go test ./...                  # Auth, RLS, Security, Refresh tokens, FS3
 | File | Description |
 |------|-------------|
 | `README.md` | This file |
-| `PHASE6_IMPLEMENTATION_SUMMARY.md` | Phase 6 implementation details |
-| `PHASE7_COMPLETION_REPORT.md` | Phase 7 completion report |
-| `PHASE_3.1_COMPLETION_REPORT.md` | Designer & legacy integration |
-| `tasks/plan.md` | Overall development plan |
-| `tasks/todo.md` | Task list |
-| `tasks/phase7_plan.md` | Phase 7 plan |
-| `API_SPECIFICATION.md` | REST API specification |
-| `DATABASE_SCHEMA_DESIGN.md` | Database schema |
-| `DATA_MIGRATION_PLAN.md` | Migration strategy |
-| `FULLSTACK_ARCHITECTURE.md` | Full-stack architecture |
-| `FULLSTACK_ROADMAP.md` | Roadmap |
+| `docs/ARCHITECTURE.md` | Final architecture: account management, project assignments, RLS, migrations, navigation |
+| `docs/USER_AND_ROLE_MANAGEMENT.md` | Roles, permissions, and account lifecycle |
+| `backend/README.md` | Backend quick start, layout, and configuration |
+| `backend/AUTHENTICATION.md` | Login, refresh-token rotation, session handling |
+| `backend/SESSION_SECURITY.md` | Token families, revocation, cookie policy |
+| `backend/ADMIN_APPROVAL.md` | Admin user approval and account management |
+| `backend/DATABASE_MIGRATION.md` | Migration workflow and schema changes |
+| `backend/DOCKER_SETUP.md` | PostgreSQL container setup |
 
 ## Operational Documentation
 
 ### Authentication & Approval
 
-**New User Registration:**
-1. Open Register page, enter email, password (min 12 chars), confirm password, full name
-2. Account created with `pending` status — awaits admin approval
-3. Admin logs into Admin Approval page (`/admin-approval`)
-4. Admin approves/rejects user; user receives status notification
+Accounts are created by an administrator — there is no public self-registration endpoint.
+
+**Create a user (admin):**
+1. Log in as admin, open **User Management**
+2. Create a STAFF or ADMIN account with a password of at least 12 characters
+3. New accounts start as `approved` and can be suspended or reactivated later
 
 **Login:**
-1. Enter email & password on Login page
-2. Access token (JWT, 15 min) stored in memory (not localStorage)
-3. Refresh token (30 days) stored in HttpOnly cookie
-4. Automatic token refresh before API requests
+1. Enter email & password on the Login page
+2. Access token (JWT, 15 min) is kept in memory (not localStorage)
+3. Refresh token (30 days) is stored in an HttpOnly cookie and rotated on refresh
+4. Suspended or rejected accounts are rejected on login *and* on refresh
 
-**Logout:** Clears access token, revokes refresh token server-side, removes cookie.
+**Logout:** Clears the access token, revokes the refresh token server-side, removes the cookie.
+
+**Project assignment (admin):** assign staff to a project with `view` or `edit` permission from **Project Assignment**. Staff only see assigned projects; unassigned project UUIDs return nothing (RLS fail-closed).
 
 ### Backup & Restore
 
