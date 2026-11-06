@@ -1,111 +1,112 @@
 # Borewell Visualizer
 
-Interactive web application for visualizing and documenting borehole construction. Designed for geotechnical engineers, hydrogeologists, and field technicians to design, monitor, and report borehole specifications visually and systematically.
- 
-## Features
+Aplikasi web interaktif untuk memvisualisasikan dan mendokumentasikan konstruksi sumur bor. Dirancang untuk insinyur geoteknik, hidrogeolog, dan teknisi lapangan dalam merancang, memantau, serta menyusun laporan spesifikasi sumur bor secara visual dan sistematis.
 
-### Project & Well Management
-- Create, edit, archive, restore, duplicate, and delete projects with validation
-- Multiple wells per project with types (production, monitoring, exploration, test) and statuses (planned, drilling, completed, on hold, abandoned)
-- Data isolation per project and well — no cross-contamination
-- Automatic legacy data migration with backup
+## Fitur
 
-### Well Designer
-- Modular components: surface casing, production casing, blank casing, screen pipe, open hole, gravel pack, cement grouting
-- Markers: well cap, submersible pump, pump position, water level
-- Technical validation: overlap detection, diameter validation, depth range checking
-- Undo/redo history (max 50) with keyboard shortcuts
-- Autosave (1.5s debounce)
-- Export canvas as PNG
-- Responsive canvas (240–700 px wide) with ruler and label columns that reflow on narrow screens
-- Collision-free component labels: stacked with a minimum gap, elbow leader lines, and ellipsis fitting
-- Properties panel: auto-computed interval length, native color picker + hex input, numeric fields kept as numbers
+### Manajemen Proyek & Sumur
+- Membuat, mengubah, mengarsipkan, memulihkan, menduplikasi, dan menghapus proyek dengan validasi
+- Banyak sumur per proyek dengan tipe (produksi, pemantauan, eksplorasi, uji) dan status (direncanakan, pengeboran, selesai, ditunda, ditinggalkan)
+- Isolasi data per proyek dan sumur — tidak ada data yang tercampur antar proyek
+- Migrasi otomatis data lama disertai cadangan
 
-### Geological Log
-- Multiple layers with material, depth, description, formation
-- 10+ material categories: topsoil, clay, silt, sand, gravel, sandstone, limestone, shale, granite, basalt
-- Proportional canvas visualization with depth scale
-- Validation: overlap warnings, gap warnings, depth-out-of-bounds
-- Summary: total layers, filled intervals, maximum depth
+### Desainer Sumur
+- Komponen modular: casing permukaan, casing produksi, blank casing, pipa screen, open hole, gravel pack, dan semen grouting
+- Penanda: tutup sumur, pompa submersible, posisi pompa, dan muka air
+- Validasi teknis: deteksi tumpang tindih, validasi diameter, dan pemeriksaan rentang kedalaman
+- Riwayat undo/redo (maksimal 50) dengan pintasan papan ketik
+- Simpan otomatis (debounce 1,5 detik)
+- Ekspor kanvas sebagai PNG
+- Kanvas responsif (lebar 240–700 px) dengan kolom ruler dan label yang menyesuaikan pada layar sempit
+- Label komponen tidak bertumpuk: ditumpuk dengan jarak minimum, garis penunjuk bersiku, dan pemotongan teks dengan elipsis
+- Panel properti: panjang interval dihitung otomatis, pemilih warna native + input hex, dan kolom numerik tetap berupa angka
 
-### Groundwater Monitoring
-- Water level measurements: timestamp, depth, reference point (TOC/GL), reference elevation, method, status, notes
-- Interactive hydrograph: time-series chart with depth and time axes
-- Statistics: min, max, average, last change, estimated water level elevation
-- CSV import/export with validation, preview, duplicate ID handling
-- Mixed reference point detection
-- Per-well data isolation
+### Log Geologi
+- Banyak lapisan dengan material, kedalaman, deskripsi, dan formasi
+- 10+ kategori material: topsoil, clay, silt, sand, gravel, sandstone, limestone, shale, granite, basalt
+- Visualisasi kanvas proporsional dengan skala kedalaman
+- Validasi: peringatan tumpang tindih, peringatan celah kosong, dan kedalaman di luar batas
+- Ringkasan: jumlah lapisan, interval terisi, dan kedalaman maksimum
 
-### Documentation & Reporting
-- Photo gallery: 10 categories, max 3 per category
-- Document management: 10 categories (permits, contracts, test results, daily reports, as-built, etc.)
-- Drag-and-drop upload with MIME validation (JPG, PNG, WebP, PDF, TXT), size limits (10MB photos, 20MB documents)
-- IndexedDB for large files (>2MB), localStorage for smaller files (base64)
-- Preview: images, PDF iframe, metadata (category, size, date, description)
-- Search and filter by name/description, category, sort (date, name, size)
-- Grid/list view toggle
-- Automatic legacy photo/activity migration
+### Pemantauan Air Tanah
+- Pengukuran muka air: waktu, kedalaman, titik acuan (TOC/GL), elevasi acuan, metode, status, dan catatan
+- Hidrograf interaktif: grafik deret waktu dengan sumbu kedalaman dan waktu
+- Statistik: minimum, maksimum, rata-rata, perubahan terakhir, dan estimasi elevasi muka air
+- Impor/ekspor CSV dengan validasi, pratinjau, dan penanganan ID duplikat
+- Deteksi titik acuan campuran
+- Isolasi data per sumur
 
-### Professional Report Builder
-- 7 report sections: Cover, Project & Well Info, Well Construction, Geological Log, Groundwater Monitoring, Field Documentation, Notes & Conclusion
-- Selective photo inclusion
-- Report metadata: title, number, revision, date, prepared by, reviewed by, company logo
-- Rich text editor for technical notes and conclusions
-- Live HTML preview before PDF export
-- Multi-page PDF: construction diagram, geological tables, hydrograph, photo gallery, signatures
+### Dokumentasi & Pelaporan
+- Galeri foto: 10 kategori, maksimal 3 foto per kategori
+- Manajemen dokumen: 10 kategori (perizinan, kontrak, hasil uji, laporan harian, as-built, dan lain-lain)
+- Unggah drag-and-drop dengan validasi MIME (JPG, PNG, WebP, PDF, TXT) dan batas ukuran (foto 10 MB, dokumen 20 MB)
+- IndexedDB untuk file besar (>2 MB), localStorage untuk file kecil (base64)
+- Pratinjau: gambar, iframe PDF, dan metadata (kategori, ukuran, tanggal, deskripsi)
+- Pencarian dan filter berdasarkan nama/deskripsi, kategori, serta pengurutan (tanggal, nama, ukuran)
+- Tampilan grid/list yang dapat diganti
+- Migrasi otomatis foto dan aktivitas lama
 
-### Data Management, Backup & Restore
-- Complete backup: ZIP archive (manifest.json + localStorage JSON + IndexedDB assets)
-- Full replace: replace all data with backup (automatic safety backup + rollback)
-- Merge: combine backup with existing data (conflict detection on project/well codes)
-- Safety backup: automatic before restore, manual recovery via UI
-- Partial export: Projects (JSON), Well (JSON), Monitoring (CSV), Geology (CSV), Docs metadata (JSON)
-- Import: Projects (JSON), Well (JSON) with validation
-- Storage health: monitor localStorage/IndexedDB usage, quota, warnings (>60% warning, >80% critical)
-- Data integrity: duplicate ID detection, orphaned documents, broken references, invalid values
-- Safe repair: preview with confirmation (rename duplicate wells, remove orphaned wells)
+### Penyusun Laporan Profesional
+- 7 bagian laporan: Sampul, Info Proyek & Sumur, Konstruksi Sumur, Log Geologi, Pemantauan Air Tanah, Dokumentasi Lapangan, serta Catatan & Kesimpulan
+- Pemilihan foto secara selektif, disematkan langsung ke PDF
+- Metadata laporan: judul, nomor, revisi, tanggal, disusun oleh, diperiksa oleh, dan logo perusahaan
+- Editor teks untuk catatan teknis dan kesimpulan
+- Pratinjau HTML sebelum ekspor PDF
+- PDF multi-halaman: diagram konstruksi, tabel geologi, hidrograf, galeri foto, dan kolom tanda tangan
+- Generator PDF modular di `src/pdf-kit` (mesin layout, diagram, dan bagian laporan terpisah)
 
-## Technology Stack
+### Manajemen Data, Cadangan & Pemulihan
+- Cadangan lengkap: arsip ZIP (manifest.json + JSON localStorage + aset IndexedDB)
+- Ganti total: mengganti seluruh data dengan cadangan (cadangan keamanan otomatis + rollback)
+- Gabung: menggabungkan cadangan dengan data yang ada (deteksi konflik kode proyek/sumur)
+- Cadangan keamanan: dibuat otomatis sebelum pemulihan, dapat dipulihkan lewat UI
+- Ekspor sebagian: Proyek (JSON), Sumur (JSON), Pemantauan (CSV), Geologi (CSV), dan metadata dokumen (JSON)
+- Impor: Proyek (JSON) dan Sumur (JSON) dengan validasi
+- Kesehatan penyimpanan: pemantauan pemakaian localStorage/IndexedDB, kuota, dan peringatan (>60% waspada, >80% kritis)
+- Integritas data: deteksi ID duplikat, dokumen yatim, referensi rusak, dan nilai tidak valid
+- Perbaikan aman: pratinjau dengan konfirmasi (ganti nama sumur duplikat, hapus sumur yatim)
 
-| Layer | Technology |
-|-------|------------|
+## Teknologi
+
+| Lapisan | Teknologi |
+|---------|-----------|
 | Frontend | React 18 + Vite 5 |
-| Icons | Lucide React |
-| Styling | Pure CSS (technical paper theme, Grid/Flexbox, responsive desktop & mobile) |
-| Visualization | Canvas API (pipes, screens, open hole, MAT, ground surface, depth scale, geological log, hydrograph) |
-| PDF Export | jsPDF |
-| Archive | JSZip |
-| Client Storage | localStorage (auto-save), IndexedDB (binary files >2MB) |
-| File API | FileReader (validation, preview, max file size) |
+| Ikon | Lucide React |
+| Styling | CSS murni (tema kertas teknis, Grid/Flexbox, responsif desktop & mobile) |
+| Visualisasi | Canvas API (pipa, screen, open hole, MAT, permukaan tanah, skala kedalaman, log geologi, hidrograf) |
+| Ekspor PDF | jsPDF |
+| Arsip | JSZip |
+| Penyimpanan klien | localStorage (simpan otomatis), IndexedDB (file biner >2 MB) |
+| File API | FileReader (validasi, pratinjau, batas ukuran file) |
 | Backend | Go 1.22 + Gin |
 | Database | PostgreSQL 15+ |
-| Auth | JWT (15min access, 30d refresh in HttpOnly cookie), Argon2id |
-| Migrations | 16 SQL migrations (users, projects, wells, files, RLS, triggers, indexes, project_assignments) |
-| Security | Row Level Security (project/well isolation, fail-closed), CSRF, Rate limiting |
+| Autentikasi | JWT (akses 15 menit, refresh 30 hari di cookie HttpOnly), Argon2id |
+| Migrasi | 16 migrasi SQL (users, projects, wells, files, RLS, trigger, indeks, project_assignments) |
+| Keamanan | Row Level Security (isolasi proyek/sumur, fail-closed), CSRF, rate limiting |
 
-## Architecture
+## Arsitektur
 
 ```mermaid
 flowchart LR
-    subgraph Client["Client (Browser)"]
-        PAGES["Feature Pages"]
+    subgraph Client["Klien (Browser)"]
+        PAGES["Halaman Fitur"]
         API["Axios Client"]
         STORE[("LocalStorage<br/>IndexedDB")]
     end
 
-    subgraph Server["Go + Gin Backend :8080"]
+    subgraph Server["Backend Go + Gin :8080"]
         REST["REST API /api/v1<br/>JWT · CSRF · CORS"]
-        APP["Handlers · Services<br/>Repositories"]
-        FS["File Storage"]
-        CLI["Migrate · Bootstrap CLI"]
+        APP["Handler · Service<br/>Repository"]
+        FS["Penyimpanan File"]
+        CLI["CLI Migrate · Bootstrap"]
     end
 
     subgraph DB["PostgreSQL 15+"]
-        PG[("borewell DB")]
+        PG[("database borewell")]
         RLS{{"RLS"}}
     end
 
-    subgraph Ext["External"]
+    subgraph Ext["Eksternal"]
         DOCKER["Docker<br/>postgres:15"]
     end
 
@@ -113,253 +114,252 @@ flowchart LR
     PAGES -.->|offline| STORE
     API -->|REST + JWT| REST
     REST --> APP
-    APP -->|files| FS
+    APP -->|file| FS
     APP -->|SQL| PG
-    RLS -.->|policies| PG
+    RLS -.->|kebijakan| PG
     CLI -->|DDL · seed| PG
-    DOCKER -.->|hosts| PG
+    DOCKER -.->|host| PG
 ```
 
-The application runs in two modes:
+Aplikasi berjalan dalam dua mode:
 
-**Frontend-only (LocalStorage/IndexedDB)** — Fully offline after initial load. No backend required. Feature pages read and write LocalStorage, and photos or documents above 2 MB go to IndexedDB.
+**Frontend saja (LocalStorage/IndexedDB)** — Sepenuhnya offline setelah pemuatan awal. Tidak memerlukan backend. Halaman fitur membaca dan menulis localStorage, sedangkan foto atau dokumen di atas 2 MB disimpan di IndexedDB.
 
-**Full-stack (Go + PostgreSQL)** — Multi-user with authentication, project/well isolation via RLS, file storage with SHA-256 deduplication, and REST API.
+**Full-stack (Go + PostgreSQL)** — Multi-pengguna dengan autentikasi, isolasi proyek/sumur melalui RLS, penyimpanan file dengan deduplikasi SHA-256, dan REST API.
 
-**Communication:**
+**Komunikasi:**
 
-- **REST** — `/api/v1` for auth, projects, wells, modules, documentation, backup, and admin. Access token travels in the `Authorization` header; the refresh token stays in an HttpOnly cookie.
-- **Middleware** — request ID, CORS allow-list, CSRF check on state-changing methods, JWT validation, and per-IP rate limiting run before any handler.
-- **Data access** — handlers delegate to services, services to repositories. Every query runs inside PostgreSQL with RLS policies scoped to the active user's project and well.
-- **File storage** — the documentation service writes to `FILE_STORAGE_PATH`, validates MIME type and size, and stores a SHA-256 checksum for deduplication.
-- **Operations** — `cmd/migrate` applies the versioned migrations, `cmd/bootstrap-admin` seeds the first approved administrator, and Docker only hosts the local PostgreSQL container.
+- **REST** — `/api/v1` untuk autentikasi, proyek, sumur, modul, dokumentasi, cadangan, dan admin. Access token dikirim melalui header `Authorization`; refresh token disimpan di cookie HttpOnly.
+- **Middleware** — request ID, allow-list CORS, pemeriksaan CSRF pada metode yang mengubah data, validasi JWT, dan rate limiting per IP dijalankan sebelum handler.
+- **Akses data** — handler memanggil service, service memanggil repository. Setiap kueri berjalan di PostgreSQL dengan kebijakan RLS sesuai proyek dan sumur pengguna aktif.
+- **Penyimpanan file** — service dokumentasi menulis ke `FILE_STORAGE_PATH`, memvalidasi MIME dan ukuran, lalu menyimpan checksum SHA-256 untuk deduplikasi.
+- **Operasional** — `cmd/migrate` menjalankan migrasi berversi, `cmd/bootstrap-admin` membuat administrator pertama, dan Docker hanya menjalankan kontainer PostgreSQL lokal.
 
-## Quick Start
+## Mulai Cepat
 
-### Frontend Only
+### Frontend Saja
 ```bash
 npm install
-npm run dev          # Development server at http://localhost:5173
-npm run build        # Production build to dist/
-npm run preview      # Preview production build
+npm run dev          # Server pengembangan di http://localhost:5173
+npm run build        # Build produksi ke dist/
+npm run preview      # Pratinjau hasil build produksi
 ```
 
-### Full-Stack Mode
+### Mode Full-Stack
 
-**Requirements:** Go 1.22+, Node.js 20+, PostgreSQL 15+, Docker (optional)
+**Kebutuhan:** Go 1.22+, Node.js 20+, PostgreSQL 15+, Docker (opsional)
 
-**Backend Setup:**
+**Menyiapkan backend:**
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env with DATABASE_URL, JWT_SECRET, REFRESH_TOKEN_SECRET, etc.
+# Sesuaikan .env: DATABASE_URL, JWT_SECRET, REFRESH_TOKEN_SECRET, dll.
 docker compose up -d postgres
 
-# Either run straight from source (recommended) …
+# Jalankan langsung dari source (disarankan) …
 go run ./cmd/migrate up
 go run ./cmd/bootstrap-admin --email admin@example.com --password "StrongPassword123"
 go run ./cmd/server
 
-# … or build local binaries (git-ignored) once:
+# … atau build binary lokal sekali (di-ignore git):
 # go build -o bin/migrate.exe ./cmd/migrate && go build -o bin/server.exe ./cmd/server
 ```
 
-**Frontend Setup:**
+**Menyiapkan frontend:**
 ```bash
 npm install
-npm run dev          # Proxies /api to backend at http://127.0.0.1:8080
+npm run dev          # Proxy /api ke backend di http://127.0.0.1:8080
 ```
 
-## Testing
+## Pengujian
 
 ```bash
-# Frontend unit / integration tests (Vitest + Testing Library)
+# Unit / integrasi frontend (Vitest + Testing Library)
 npm test
 
-# End-to-end tests (Playwright)
+# Uji end-to-end (Playwright)
 npx playwright test
 
-# Backend tests (auth, RLS, security, refresh tokens, admin & assignments)
+# Uji backend (auth, RLS, keamanan, refresh token, admin & penugasan)
 cd backend
 go test ./...
 
-# Legacy browser verification scripts
-node tests/phase2_verify.mjs   # Project & Well Management
-node tests/phase3_verify.mjs   # Advanced Well Designer
-node tests/phase4_verify.mjs   # Geological Log
-node tests/phase5_verify.mjs   # Groundwater Monitoring
-node tests/phase7_verify.mjs   # Data Management, Backup & Restore
-node tests/pdf_verify.mjs      # PDF Generation
+# Skrip verifikasi browser lama
+node tests/phase2_verify.mjs   # Manajemen Proyek & Sumur
+node tests/phase3_verify.mjs   # Desainer Sumur Lanjutan
+node tests/phase4_verify.mjs   # Log Geologi
+node tests/phase5_verify.mjs   # Pemantauan Air Tanah
+node tests/phase7_verify.mjs   # Manajemen Data, Cadangan & Pemulihan
+node tests/pdf_verify.mjs      # Pembuatan PDF
 ```
 
-## Storage Architecture
+## Arsitektur Penyimpanan
 
-**LocalStorage Keys:**
-- `borewell-projects:v1` — Project list + active project/well IDs
-- `borewell-project-{id}:v1` — Individual project record
-- `borewell-well-{id}:v1` — Well data (well, model, activity)
-- `borewell-project-docs:v1` — Project-level documentation
-- `borewell-well-docs-{wellId}:v1` — Well-level documentation
-- `borewell-migration:v1` — Migration status flag
-- `borewell-safety-backup:v1` — Safety backup for restore
-- `borewell-backup-history:v1` — Local backup history (max 50)
+**Kunci LocalStorage:**
+- `borewell-projects:v1` — Daftar proyek + ID proyek/sumur aktif
+- `borewell-project-{id}:v1` — Data satu proyek
+- `borewell-well-{id}:v1` — Data sumur (well, model, activity)
+- `borewell-project-docs:v1` — Dokumentasi tingkat proyek
+- `borewell-well-docs-{wellId}:v1` — Dokumentasi tingkat sumur
+- `borewell-migration:v1` — Penanda status migrasi
+- `borewell-safety-backup:v1` — Cadangan keamanan untuk pemulihan
+- `borewell-backup-history:v1` — Riwayat cadangan lokal (maksimal 50)
 
-**IndexedDB:** `BorewellDocsDB` (v1) with `photos` and `documents` object stores (key: `id`), storing binary files as base64 data URLs.
+**IndexedDB:** `BorewellDocsDB` (v1) dengan object store `photos` dan `documents` (key: `id`), menyimpan file biner sebagai data URL base64.
 
-## Security & Privacy
+## Keamanan & Privasi
 
-- **Frontend-only mode:** No backend, cloud database, or paid APIs. All data stays in the user's browser.
-- **File validation:** MIME type, extension, and size validated before storage.
-- **CSV sanitization:** Formula injection prevention on export.
-- **Path traversal protection:** ZIP extraction with `filepath.Clean` and path verification.
-- **Offline-first:** Works completely offline after initial load.
-- **Backend mode:** RLS enforces project/well isolation at database level. JWT in memory, refresh token in HttpOnly cookie. Argon2id password hashing. CSRF protection on state-changing endpoints.
+- **Mode frontend saja:** Tanpa backend, database cloud, atau API berbayar. Seluruh data tetap di browser pengguna.
+- **Validasi file:** MIME, ekstensi, dan ukuran divalidasi sebelum disimpan.
+- **Sanitasi CSV:** Pencegahan formula injection saat ekspor.
+- **Perlindungan path traversal:** Ekstraksi ZIP dengan `filepath.Clean` dan verifikasi path.
+- **Offline-first:** Berfungsi penuh secara offline setelah pemuatan awal.
+- **Mode backend:** RLS menegakkan isolasi proyek/sumur di level database. JWT disimpan di memori, refresh token di cookie HttpOnly. Password di-hash dengan Argon2id. Endpoint yang mengubah data dilindungi CSRF.
 
-## Responsive Design & Accessibility
+## Desain Responsif & Aksesibilitas
 
-| Breakpoint | Layout |
-|------------|--------|
-| ≥1200px | Full 3-column (toolbar, canvas, properties) |
-| 768–1199px | 2-column, properties panel hidden |
-| <768px | Single column, bottom tab bar, drawer sidebar, dialog bottom-sheet |
+| Breakpoint | Tata Letak |
+|------------|------------|
+| ≥1200px | 3 kolom penuh (toolbar, kanvas, properti) |
+| 768–1199px | 2 kolom, panel properti disembunyikan |
+| <768px | Satu kolom, tab bar bawah, sidebar drawer, dialog bottom-sheet |
 
-- Keyboard navigation: visible focus, logical tab order, Escape to close dialogs
-- Semantic HTML: `<button>`, `<nav>`, `<main>`, `<section>`, `<dialog>`, form elements
-- ARIA: labels, roles, `aria-current`, `aria-disabled`, `aria-live`
-- Color contrast meets WCAG AA
-- Respects `prefers-reduced-motion`
+- Navigasi papan ketik: fokus terlihat, urutan tab logis, Escape untuk menutup dialog
+- HTML semantik: `<button>`, `<nav>`, `<main>`, `<section>`, `<dialog>`, dan elemen form
+- ARIA: label, role, `aria-current`, `aria-disabled`, `aria-live`
+- Kontras warna memenuhi WCAG AA
+- Menghormati `prefers-reduced-motion`
 
-## Performance
+## Performa
 
-- Bundle size: ~517 KB (gzipped ~144 KB)
-- Code splitting: vendor chunks (jsPDF, JSZip, html2canvas)
-- Lazy loading: heavy libraries load on demand
-- Autosave debounce: 1.5s reduces storage writes
-- Canvas optimization: `requestAnimationFrame`, offscreen rendering
-- IndexedDB async: non-blocking file operations
+- Ukuran bundle: chunk utama ±476 KB (gzip ±127 KB) ditambah chunk vendor terpisah
+- Code splitting: chunk vendor (jsPDF, JSZip, html2canvas)
+- Lazy loading: pustaka berat dimuat sesuai kebutuhan
+- Debounce simpan otomatis 1,5 detik untuk menekan penulisan penyimpanan
+- Optimasi kanvas: `requestAnimationFrame` dan rendering offscreen
+- IndexedDB asinkron: operasi file tidak memblokir UI
 
-## Documentation
+## Dokumentasi
 
-| File | Description |
-|------|-------------|
-| `README.md` | This file |
-| `docs/ARCHITECTURE.md` | Final architecture: account management, project assignments, RLS, migrations, navigation |
-| `docs/USER_AND_ROLE_MANAGEMENT.md` | Roles, permissions, and account lifecycle |
-| `backend/README.md` | Backend quick start, layout, and configuration |
-| `backend/AUTHENTICATION.md` | Login, refresh-token rotation, session handling |
-| `backend/SESSION_SECURITY.md` | Token families, revocation, cookie policy |
-| `backend/ADMIN_APPROVAL.md` | Admin user approval and account management |
-| `backend/DATABASE_MIGRATION.md` | Migration workflow and schema changes |
-| `backend/DOCKER_SETUP.md` | PostgreSQL container setup |
+| File | Deskripsi |
+|------|-----------|
+| `README.md` | Dokumen ini |
+| `docs/ARCHITECTURE.md` | Arsitektur final: manajemen akun, penugasan proyek, RLS, migrasi, navigasi |
+| `docs/USER_AND_ROLE_MANAGEMENT.md` | Peran, izin, dan siklus hidup akun |
+| `backend/README.md` | Mulai cepat, struktur, dan konfigurasi backend |
+| `backend/AUTHENTICATION.md` | Login, rotasi refresh token, dan penanganan sesi |
+| `backend/SESSION_SECURITY.md` | Token family, pencabutan token, dan kebijakan cookie |
+| `backend/ADMIN_APPROVAL.md` | Persetujuan pengguna dan manajemen akun oleh admin |
+| `backend/DATABASE_MIGRATION.md` | Alur migrasi dan perubahan skema |
+| `backend/DOCKER_SETUP.md` | Penyiapan kontainer PostgreSQL |
 
-## Operational Documentation
+## Panduan Operasional
 
-### Authentication & Approval
+### Autentikasi & Persetujuan Akun
 
-Accounts are created by an administrator — there is no public self-registration endpoint.
+Akun dibuat oleh administrator — tidak ada endpoint pendaftaran mandiri untuk publik.
 
-**Create a user (admin):**
-1. Log in as admin, open **User Management**
-2. Create a STAFF or ADMIN account with a password of at least 12 characters
-3. New accounts start as `approved` and can be suspended or reactivated later
+**Membuat pengguna (admin):**
+1. Login sebagai admin, buka **User Management**
+2. Buat akun STAFF atau ADMIN dengan password minimal 12 karakter
+3. Akun baru langsung berstatus `approved` dan dapat di-suspend atau diaktifkan kembali
 
 **Login:**
-1. Enter email & password on the Login page
-2. Access token (JWT, 15 min) is kept in memory (not localStorage)
-3. Refresh token (30 days) is stored in an HttpOnly cookie and rotated on refresh
-4. Suspended or rejected accounts are rejected on login *and* on refresh
+1. Masukkan email & password di halaman Login
+2. Access token (JWT, 15 menit) disimpan di memori (bukan localStorage)
+3. Refresh token (30 hari) disimpan di cookie HttpOnly dan dirotasi setiap refresh
+4. Akun yang di-suspend atau ditolak akan ditolak saat login *dan* saat refresh
 
-**Logout:** Clears the access token, revokes the refresh token server-side, removes the cookie.
+**Logout:** Menghapus access token, mencabut refresh token di server, dan menghapus cookie.
 
-**Project assignment (admin):** assign staff to a project with `view` or `edit` permission from **Project Assignment**. Staff only see assigned projects; unassigned project UUIDs return nothing (RLS fail-closed).
+**Penugasan proyek (admin):** tugaskan staff ke proyek dengan izin `view` atau `edit` lewat **Project Assignment**. Staff hanya melihat proyek yang ditugaskan; UUID proyek lain tidak mengembalikan data (RLS fail-closed).
 
-### Backup & Restore
+### Cadangan & Pemulihan
 
-**Backend (Database + Files):**
+**Backend (database + file):**
 ```bash
-# Backup database
+# Cadangkan database
 pg_dump -h localhost -U postgres -d borewell -Fc -f borewell_backup_$(date +%Y%m%d_%H%M%S).dump
 
-# Restore database
+# Pulihkan database
 pg_restore -h localhost -U postgres -d borewell -c borewell_backup_20260101_120000.dump
 
-# Backup file storage
+# Cadangkan penyimpanan file
 tar -czf files_backup_$(date +%Y%m%d_%H%M%S).tar.gz ./data/files
 ```
 
-**Frontend (via UI — Data Management page):**
-- Tab "Backup & Restore" → "Create & Download Backup" → ZIP file
-- Backup includes: projects, wells, designer, geology, monitoring, photos, documents, IndexedDB assets
-- Restore: select ZIP → choose "Full Replace" or "Merge" → confirm
-- Safety backup created automatically before restore; recoverable via "Restore Safety Backup"
+**Frontend (melalui UI — halaman Data Management):**
+- Tab "Backup & Restore" → "Create & Download Backup" → file ZIP
+- Isi cadangan: proyek, sumur, desainer, geologi, pemantauan, foto, dokumen, dan aset IndexedDB
+- Pemulihan: pilih ZIP → tentukan "Full Replace" atau "Merge" → konfirmasi
+- Cadangan keamanan dibuat otomatis sebelum pemulihan; dapat dipulihkan lewat "Restore Safety Backup"
 
-**Consistency:** Database and file storage backups must run simultaneously for metadata-file consistency.
+**Konsistensi:** Cadangan database dan penyimpanan file harus dijalankan bersamaan agar metadata selaras dengan file.
 
-### File Storage
+### Penyimpanan File
 
-- Location: `FILE_STORAGE_PATH` from `.env` (default: `backend/data/files/`)
-- Structure: `photos/{uuid}.{ext}`, `documents/{uuid}.{ext}`
-- Validation: MIME type (content-based via `mimetype` lib), extension, size (photos 10MB, documents 20MB)
-- Path traversal protection: `filepath.Clean` + verification under `FILE_STORAGE_PATH`
-- SHA-256 checksum stored for deduplication and integrity verification
+- Lokasi: `FILE_STORAGE_PATH` dari `.env` (default: `backend/data/files/`)
+- Struktur: `photos/{uuid}.{ext}`, `documents/{uuid}.{ext}`
+- Validasi: MIME (berbasis konten via pustaka `mimetype`), ekstensi, dan ukuran (foto 10 MB, dokumen 20 MB)
+- Perlindungan path traversal: `filepath.Clean` + verifikasi di dalam `FILE_STORAGE_PATH`
+- Checksum SHA-256 disimpan untuk deduplikasi dan verifikasi integritas
 
-### Legacy Migration
+### Migrasi Data Lama
 
-**Migration Wizard (Data Management → Legacy Migration):**
-1. Click "Scan Legacy Data" — detects legacy localStorage/IndexedDB data
-2. Review preview: project count, well count, photos, documents, code conflicts
-3. Choose: "Skip Conflicts" or auto-rename (`-IMPORT` suffix)
-4. Click "Import" — transactional migration to backend
-5. Results: imported/skipped/errors per item
+**Wizard Migrasi (Data Management → Legacy Migration):**
+1. Klik "Scan Legacy Data" — mendeteksi data lama di localStorage/IndexedDB
+2. Tinjau pratinjau: jumlah proyek, jumlah sumur, foto, dokumen, dan konflik kode
+3. Pilih: "Skip Conflicts" atau ganti nama otomatis (akhiran `-IMPORT`)
+4. Klik "Import" — migrasi transaksional ke backend
+5. Hasil: jumlah berhasil/dilewati/galat per item
 
-**Note:** One-way migration (legacy → backend). Legacy data remains in browser until manually cleared.
+**Catatan:** Migrasi bersifat satu arah (lama → backend). Data lama tetap ada di browser sampai dihapus manual.
 
-## Troubleshooting
+## Pemecahan Masalah
 
-| Issue | Cause & Solution |
-|-------|------------------|
-| Frontend can't connect to backend | Verify backend running on port 8080, check Vite proxy config |
-| Login fails "Invalid credentials" | Check user status `approved`, correct password, DB accessibility |
-| Refresh token 401 repeatedly | Cookie not sent (check SameSite, Secure, domain), clear browser cookies |
-| Upload fails "Invalid MIME type" | File corrupt or disallowed format; check `mimetype` detection |
-| Backup restore fails | Verify manifest.json format, version compatibility, disk space |
-| RLS "permission denied" | Ensure RLS migrations applied (`goose up`), user context set via `SET LOCAL` |
-| Build chunk size warning | Optimized via `manualChunks` in `vite.config.js` |
+| Masalah | Penyebab & Solusi |
+|---------|-------------------|
+| Frontend tidak bisa terhubung ke backend | Pastikan backend berjalan di port 8080 dan periksa konfigurasi proxy Vite |
+| Login gagal "Invalid credentials" | Periksa status pengguna `approved`, password, dan akses database |
+| Refresh token 401 berulang | Cookie tidak terkirim (periksa SameSite, Secure, domain); bersihkan cookie browser |
+| Unggah gagal "Invalid MIME type" | File rusak atau format tidak diizinkan; periksa deteksi `mimetype` |
+| Pemulihan cadangan gagal | Verifikasi format manifest.json, kompatibilitas versi, dan ruang disk |
+| RLS "permission denied" | Pastikan migrasi RLS sudah diterapkan (`goose up`) dan konteks pengguna di-set via `SET LOCAL` |
+| Peringatan ukuran chunk saat build | Sudah dioptimasi lewat `manualChunks` di `vite.config.js` |
 
-### Shutdown
+### Mematikan Layanan
 
-1. **Frontend (Vite dev server):** `Ctrl+C` in Vite terminal
-2. **Backend (Go server):** `Ctrl+C` in backend terminal — graceful shutdown 30s timeout
+1. **Frontend (Vite dev server):** `Ctrl+C` di terminal Vite
+2. **Backend (server Go):** `Ctrl+C` di terminal backend — graceful shutdown dengan batas 30 detik
 3. **PostgreSQL (Docker):** `docker stop postgres-borewell` → `docker rm postgres-borewell`
-4. **PostgreSQL (Manual/Systemd):** `systemctl stop postgresql` or `pg_ctl stop`
+4. **PostgreSQL (manual/Systemd):** `systemctl stop postgresql` atau `pg_ctl stop`
 
-**Important:** Stop backend before PostgreSQL to avoid interrupted transactions.
+**Penting:** Hentikan backend sebelum PostgreSQL agar tidak ada transaksi yang terputus.
 
-## Application Identity
+## Identitas Aplikasi
 
-- **Name:** Borewell Visualizer / Visualisasi Pipa Sumur Bor
-- **Version:** 2.0.0
+- **Nama:** Borewell Visualizer / Visualisasi Pipa Sumur Bor
+- **Versi:** 2.0.0
 - **Favicon:** `img/tubes.png`
-- **Title:** "Visualisasi Pipa Sumur Bor"
+- **Judul:** "Visualisasi Pipa Sumur Bor"
 - **Brand:** "Borewell Visualizer" (sidebar), "Sumur Bor — Visualisasi konstruksi" (topbar)
 
-## Known Limitations
+## Keterbatasan yang Diketahui
 
-1. **Report preview:** HTML preview simplified — PDF output more sophisticated
-2. **IndexedDB in tests:** Mocked in test environment
-3. **Large file fallback:** Base64 in localStorage if IndexedDB unavailable
-4. **Migration one-way:** Legacy → modern, no rollback to legacy
-5. **Offline-only (frontend mode):** No cloud sync or multi-device support
-6. **Single user (frontend mode):** No authentication or multi-user support
-7. **Backend production hardening:** HTTPS, production secrets, deployment not verified (local only)
+1. **Pratinjau laporan:** Pratinjau HTML disederhanakan — hasil PDF lebih lengkap
+2. **IndexedDB pada pengujian:** Di-mock di lingkungan tes
+3. **Fallback file besar:** Base64 di localStorage bila IndexedDB tidak tersedia
+4. **Migrasi satu arah:** Lama → modern, tanpa rollback ke data lama
+5. **Hanya offline (mode frontend):** Tanpa sinkronisasi cloud atau dukungan multi-perangkat
+6. **Satu pengguna (mode frontend):** Tanpa autentikasi atau dukungan multi-pengguna
+7. **Pengerasan produksi backend:** HTTPS, secret produksi, dan deployment belum diverifikasi (baru lokal)
 
-## Future Enhancements (Out of Scope)
+## Rencana Pengembangan (Di Luar Cakupan)
 
-- Batch operations (multi-select delete/download)
-- Custom report templates
-- Digital signature support
-- Cloud sync/backup
-- OCR for scanned documents
-- Multi-language support
-- Advanced charting (drill-down, annotations)
-
+- Operasi massal (hapus/unduh multi-pilih)
+- Template laporan kustom
+- Dukungan tanda tangan digital
+- Sinkronisasi/cadangan cloud
+- OCR untuk dokumen hasil pindai
+- Dukungan multi-bahasa
+- Grafik lanjutan (drill-down, anotasi)
