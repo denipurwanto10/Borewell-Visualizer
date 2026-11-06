@@ -18,3 +18,7 @@ setup_test_db.sql
 playwright-report/
 test-results/
 screenshots/
+
+# build output (binaries are built with `go build ./cmd/...`)
+backend/bin/
+*.bak
