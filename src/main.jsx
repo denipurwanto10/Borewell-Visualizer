@@ -17,6 +17,7 @@ import './refine.css'
 import './datepicker.css'
 import './mobile-shell.css'
 import './layout-fix.css'
+import './designer-fix.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

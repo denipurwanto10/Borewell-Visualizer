@@ -277,8 +277,18 @@ async function main() {
     const canvas = page.locator('.canvas-stage canvas').first();
     const box = await canvas.boundingBox();
     if (box) {
-      await page.mouse.click(box.x + box.width / 2, box.y + Math.min(box.height * 0.45, 400));
+      // Click near component area to select it and show properties panel
+      await page.mouse.click(box.x + 60, box.y + Math.min(box.height * 0.45, 400));
       await page.waitForTimeout(900);
+      
+      // Ensure properties panel is visible - retry if needed
+      const propsPanel = page.locator('.properties-col');
+      const panelVisible = await propsPanel.evaluate((el) => el.style.display !== 'none' && el.offsetWidth > 0);
+      if (!panelVisible) {
+        // Try clicking again to force component selection
+        await page.mouse.click(box.x + 80, box.y + Math.min(box.height * 0.5, 400));
+        await page.waitForTimeout(900);
+      }
     }
     await page.waitForTimeout(400);
     await page.screenshot({ path: path.join(OUT, '03-desain-konstruksi-1440x900.png'), animations: 'disabled' });

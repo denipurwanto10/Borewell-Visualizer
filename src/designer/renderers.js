@@ -238,6 +238,7 @@ export function renderMarkerComponent(ctx, comp, {
     startDepth: comp.startDepth, endDepth: comp.startDepth,
     outerDiameter: comp.outerDiameter, innerDiameter: comp.innerDiameter,
     material: comp.material, color: comp.color,
+    isMarker: true,
     detail: `Kedalaman ${comp.startDepth} m · ${comp.material}`,
   };
 }
@@ -269,25 +270,59 @@ export function drawSelection(ctx, box) {
   ctx.restore();
 }
 
-// Draw component label to the right of the well with a leader line
-export function drawComponentLabel(ctx, box, { labelX, centerY, maxLabelWidth }) {
+function fitText(ctx, value, maxWidth) {
+  if (ctx.measureText(value).width <= maxWidth) return value;
+  let t = value;
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) t = t.slice(0, -1);
+  return t + '…';
+}
+
+// Atur posisi Y label agar tidak bertumpuk (jarak minimum antar label).
+export function layoutLabels(boxes, { minGap = 30, top = 0, bottom = Infinity } = {}) {
+  const items = boxes
+    .map(b => ({ box: b, anchorY: b.y + b.height / 2 }))
+    .sort((a, b) => a.anchorY - b.anchorY);
+  let prev = top - minGap;
+  for (const it of items) {
+    it.labelY = Math.max(it.anchorY, prev + minGap);
+    prev = it.labelY;
+  }
+  // geser ke atas bila melewati batas bawah
+  let limit = bottom;
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i].labelY > limit) items[i].labelY = limit;
+    limit = items[i].labelY - minGap;
+  }
+  return items;
+}
+
+// Label di kanan dengan garis penunjuk siku
+export function drawComponentLabel(ctx, box, { labelX, centerY, anchorY, maxLabelWidth = 130 }) {
   const label = box.name || COMPONENT_LABELS[box.type] || 'Komponen';
-  const depthText = `${box.startDepth} – ${box.endDepth} m`;
+  const depthText = box.isMarker ? `${box.startDepth} m` : `${box.startDepth} – ${box.endDepth} m`;
+  const ay = anchorY !== undefined ? anchorY : centerY;
   ctx.save();
-  ctx.strokeStyle = '#475569';
+  ctx.strokeStyle = '#94a3b8';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(box.x + box.width, centerY);
-  ctx.lineTo(labelX, centerY);
+  const startX = box.x + box.width;
+  const elbow = labelX - 10;
+  ctx.moveTo(startX, ay);
+  ctx.lineTo(elbow, ay);
+  if (Math.abs(ay - centerY) > 0.5) ctx.lineTo(elbow + 6, centerY);
+  else ctx.lineTo(labelX - 4, centerY);
   ctx.stroke();
+  ctx.fillStyle = '#94a3b8';
+  ctx.beginPath(); ctx.arc(startX, ay, 2, 0, Math.PI * 2); ctx.fill();
 
-  ctx.fillStyle = '#1e293b';
-  ctx.font = 'bold 11px Hanken Grotesk, system-ui, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(label, labelX, centerY);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#1e293b';
+  ctx.font = '700 11.5px Hanken Grotesk, system-ui, sans-serif';
+  ctx.fillText(fitText(ctx, label, maxLabelWidth), labelX, centerY - 1);
 
   ctx.fillStyle = '#64748b';
-  ctx.font = '10px Hanken Grotesk, system-ui, sans-serif';
-  ctx.fillText(depthText, labelX, centerY + 13);
+  ctx.font = '500 10.5px Hanken Grotesk, system-ui, sans-serif';
+  ctx.fillText(depthText, labelX, centerY + 12);
   ctx.restore();
 }

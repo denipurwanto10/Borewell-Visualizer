@@ -225,7 +225,7 @@ export default function ProjectDetailPage({ projectId }) {
 
   const handleOpen = (wellId) => {
     selectWell(wellId);
-    window.location.hash = '/visualisasi';
+    window.location.hash = '#/visualisasi';
   };
 
   if (!project) {

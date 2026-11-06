@@ -1,0 +1,97 @@
+/* ==========================================================================
+   designer-fix.css — DIMUAT PALING AKHIR.
+   Merapikan panel "Properti Komponen" (grid 2 kolom, tinggi input seragam,
+   satuan sejajar, input warna) dan kartu kanvas desain.
+   ========================================================================== */
+
+.properties-panel { gap: 0; align-content: start; overflow: hidden; }
+.properties-panel .panel-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; margin: 0; border-bottom: 1px solid var(--line);
+}
+.properties-panel .panel-head h2 {
+  flex: 1; min-width: 0; margin: 0; font-size: 15px; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.properties-panel .type-badge {
+  flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.properties-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px; padding: 16px; align-items: start;
+}
+.properties-grid .col-2 { grid-column: 1 / -1; }
+.properties-grid .field { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.properties-grid .field-label {
+  font-size: 12px; font-weight: 600; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.properties-grid .field-control { width: 100%; }
+.properties-grid .field-input {
+  height: 40px; padding: 0 12px; font-size: 14px; border-radius: 10px; width: 100%; box-sizing: border-box;
+}
+.properties-grid .field-control:has(.field-unit) .field-input { padding-right: 38px; }
+.properties-grid .field-unit { right: 12px; font-size: 11.5px; }
+.properties-grid textarea.field-input { height: auto; min-height: 84px; padding: 10px 12px; line-height: 1.45; resize: vertical; }
+.properties-grid .field-hint { font-size: 11.5px; line-height: 1.35; margin: 0; }
+.properties-grid .field-input:disabled,
+.properties-grid .field-input[readonly] {
+  background: var(--paper-2, #f1efe8); color: var(--mute); cursor: default; border-color: var(--line);
+}
+.properties-grid .is-computed .field-input { font-weight: 600; color: var(--ink); }
+.properties-grid .field-spacer { min-height: 1px; }
+
+/* Warna: swatch + kode hex dalam satu baris */
+.color-control { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; align-items: center; }
+.color-swatch {
+  width: 40px; height: 40px; padding: 3px; border: 1px solid var(--line-2);
+  border-radius: 10px; background: var(--card); cursor: pointer; appearance: none; -webkit-appearance: none;
+}
+.color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.color-swatch::-webkit-color-swatch { border: 0; border-radius: 6px; }
+.color-swatch::-moz-color-swatch { border: 0; border-radius: 6px; }
+.color-hex { font-family: var(--mono); text-transform: uppercase; }
+
+.property-actions { padding: 14px 16px 16px; gap: 10px; border-top: 1px solid var(--line); display: grid; }
+.prop-toggle { min-height: 40px; }
+
+/* Kanvas desain */
+.designer-canvas-wrap { padding: 12px 0; border: 1px solid var(--line); background: var(--paper-2, #f4f2ea); }
+.designer-sheet canvas { border-radius: 14px; box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06); }
+
+/* ---------- Responsif: panel tidak boleh melebihi lebar drawer/kolom ---------- */
+.props-drawer { grid-template-columns: minmax(0, 1fr); max-width: 100vw; box-sizing: border-box; }
+.props-drawer > * { min-width: 0; }
+.props-drawer-body { min-width: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; }
+.props-drawer-body .properties-panel { box-shadow: none; border: 0; border-radius: 0; background: transparent; }
+.props-drawer-body .properties-panel .panel-head { padding-top: 0; }
+.props-drawer-body .properties-grid,
+.props-drawer-body .property-actions { padding-left: 0; padding-right: 0; }
+
+.properties-col { min-width: 0 !important; }
+.properties-panel { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.properties-panel > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.properties-grid > * { min-width: 0; }
+.properties-grid .field-control,
+.properties-grid .field-input { min-width: 0; max-width: 100%; }
+.property-actions .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.property-actions .btn { min-width: 0; white-space: normal; }
+.validation-hint { align-items: flex-start; }
+.validation-hint svg { flex: none; margin-top: 2px; }
+
+/* Layar sangat sempit: satu kolom */
+@media (max-width: 340px) {
+  .properties-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Kanvas desain: jangan terpotong di kedua sisi ---------- */
+.designer-canvas-wrap {
+  display: block !important; justify-items: normal !important;
+  overflow-x: auto; overflow-y: hidden; width: 100%; max-width: 100%; box-sizing: border-box;
+  padding: 12px; min-width: 0;
+}
+.designer-canvas-wrap .designer-sheet {
+  width: max-content; max-width: none; margin-inline: auto;
+}
+.designer-canvas-wrap canvas { display: block; }

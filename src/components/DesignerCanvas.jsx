@@ -3,7 +3,7 @@ import { useCanvasGestures } from '../hooks/useCanvasGestures';
 import {
   depthToPixel, computeDepthScale, rulerTickStep,
 } from '../designer/geometry';
-import { renderComponents as renderCompBoxes, drawGrid, drawDepthRuler, drawGroundLine, drawMatLine, drawSelection, drawComponentLabel } from '../designer/renderers';
+import { renderComponents as renderCompBoxes, drawGrid, drawDepthRuler, drawGroundLine, drawMatLine, drawSelection, drawComponentLabel, layoutLabels } from '../designer/renderers';
 import { COMPONENT_LABELS } from '../designer/model';
 
 const BASE_WIDTH = 360;
@@ -32,14 +32,14 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width } = entry.contentRect;
-        const newWidth = Math.max(280, Math.min(width, 700));
+        const newWidth = Math.max(240, Math.min(width || BASE_WIDTH, 700));
         const newHeight = (newWidth / BASE_WIDTH) * BASE_HEIGHT;
         setDimensions({ width: newWidth, height: newHeight });
       }
     });
     ro.observe(wrapper);
     const { width } = wrapper.getBoundingClientRect();
-    const newWidth = Math.max(280, Math.min(width, 700));
+    const newWidth = Math.max(240, Math.min(width || BASE_WIDTH, 700));
     const newHeight = (newWidth / BASE_WIDTH) * BASE_HEIGHT;
     setDimensions({ width: newWidth, height: newHeight });
     return () => ro.disconnect();
@@ -49,10 +49,17 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     const { width: W, height: H } = dimensions;
     const plotTop = PLOT_TOP_RATIO * H;
     const plotBottom = H - PLOT_BOTTOM_RATIO * H;
-    const wellAxisPx = W / 2;
-    const pxPerMm = 0.35;
-    return { W, H, plotTop, plotBottom, wellAxisPx, pxPerMm };
-  }, [dimensions]);
+    const rulerX = 44;
+    const labelCol = W < 340 ? 96 : W < 460 ? 112 : 130;
+    const labelX = W - labelCol;
+    const zoneL = rulerX + 18;
+    const zoneR = labelX - 22;
+    const free = Math.max(40, zoneR - zoneL);
+    const maxOD = Math.max(150, ...(components || []).filter(c => c.visible).map(c => Number(c.outerDiameter) || 0));
+    const pxPerMm = 0.35; // gaya pipa asli: lebar 34–62px
+    const wellAxisPx = zoneL + free / 2;
+    return { W, H, plotTop, plotBottom, wellAxisPx, pxPerMm, rulerX, labelX, labelCol, free };
+  }, [dimensions, components]);
 
   const scaleInfo = useMemo(() => {
     return computeDepthScale(components || [], config, {
@@ -104,7 +111,7 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const devicePixelRatio = window.devicePixelRatio || 1;
-    const { W, H, plotTop, plotBottom, wellAxisPx, pxPerMm } = plot;
+    const { W, H, plotTop, plotBottom, wellAxisPx, pxPerMm, rulerX, labelX: labelColX, labelCol } = plot;
 
     canvas.width = W * devicePixelRatio;
     canvas.height = H * devicePixelRatio;
@@ -133,7 +140,6 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
         drawGrid(ctx, { plotTop, plotBottom, minDepth, maxDepth, plotLeft: 0, plotRight: W, step });
       }
 
-      const rulerX = 40;
       drawDepthRuler(ctx, { plotTop, plotBottom, minDepth, maxDepth, rulerX, step });
 
       drawGroundLine(ctx, { depthY: groundY, plotLeft: 0, plotRight: W, wellX: wellAxisPx, casingWidth: 62 });
@@ -146,14 +152,15 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
       boxes.push(...compBoxes);
       boxesRef.current = boxes;
 
-      // Labels right side with overlap prevention
-      const labelX = W - 170;
-      let lastLabelY = -Infinity;
-      for (const box of boxes) {
-        const centerY = box.y + box.height / 2;
-        const labelY = centerY - lastLabelY < 26 ? lastLabelY + 26 : centerY;
-        lastLabelY = labelY;
-        drawComponentLabel(ctx, box, { labelX, centerY: labelY });
+      // Label sisi kanan: rapi, rata kiri, tanpa tumpang tindih
+      const labelX = labelColX;
+      const maxCasing = boxes.reduce((m, b) => Math.max(m, b.width), 0);
+      const laid = layoutLabels(boxes, { minGap: 30, top: plotTop + 8, bottom: plotBottom - 8 });
+      for (const it of laid) {
+        drawComponentLabel(ctx, it.box, {
+          labelX: Math.max(labelX, wellAxisPx + maxCasing / 2 + 24),
+          centerY: it.labelY, anchorY: it.anchorY, maxLabelWidth: Math.max(60, labelCol - 12),
+        });
       }
 
       if (selectedId) {
@@ -167,8 +174,8 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
         ctx.textAlign = 'left';
         ctx.fillText(`Permukaan tanah (${config.groundLevel} m)`, 14, groundY - 10);
         ctx.fillStyle = '#b45309';
-        for (let x = 40; x < W - 40; x += 26) {
-          if (x + 13 > wellAxisPx - 31 && x < wellAxisPx + 31) continue;
+        for (let x = rulerX + 4; x < labelX - 8; x += 26) {
+          if (x + 13 > wellAxisPx - 46 && x < wellAxisPx + 46) continue;
           ctx.beginPath();
           ctx.moveTo(x, groundY);
           ctx.lineTo(x + 6.5, groundY - 7);
@@ -182,7 +189,7 @@ export const DesignerCanvas = forwardRef(function DesignerCanvas({
         ctx.font = '700 11px Hanken Grotesk, system-ui, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(`MAT (${config.matLevel} m)`, 14, matY + 16);
-        const triCX = W - 34;
+        const triCX = labelX - 14;
         ctx.beginPath();
         ctx.moveTo(triCX - 7, matY - 10);
         ctx.lineTo(triCX + 7, matY - 10);

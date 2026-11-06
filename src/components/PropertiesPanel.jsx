@@ -3,6 +3,8 @@ import { Trash2, Copy, Eye, EyeOff, Save, AlertTriangle, Info } from 'lucide-rea
 import { Button, Field } from './Primitives';
 import { COMPONENT_LABELS, COMPONENT_DEFAULTS, INTERVAL_TYPES, MARKER_TYPES } from '../designer/model';
 
+const NUMERIC_KEYS = new Set(['startDepth', 'endDepth', 'length', 'outerDiameter', 'innerDiameter', 'zOrder']);
+
 export default function PropertiesPanel({ component, onUpdate, onDuplicate, onDelete, onVisibilityToggle }) {
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(component ? { ...component } : null);
@@ -26,6 +28,8 @@ export default function PropertiesPanel({ component, onUpdate, onDuplicate, onDe
     );
   }
 
+  const val = (k) => (local && local[k] !== undefined && local[k] !== null ? local[k] : (component[k] ?? ''));
+  const hasInner = component.innerDiameter !== null && component.innerDiameter !== undefined;
   const label = COMPONENT_LABELS[component.type] || component.type;
   const isInterval = INTERVAL_TYPES.has(component.type);
 
@@ -42,8 +46,17 @@ export default function PropertiesPanel({ component, onUpdate, onDuplicate, onDe
 
   const handleChange = (key, value) => {
     if (!local) return;
-    const n = num(value);
-    setLocal({ ...local, [key]: n !== null && n !== undefined ? n : value });
+    const next = { ...local };
+    if (NUMERIC_KEYS.has(key)) {
+      const n = num(value);
+      next[key] = n !== null ? n : value;
+    } else {
+      next[key] = value;
+    }
+    if (isInterval && (key === 'startDepth' || key === 'endDepth')) {
+      next.length = Math.max(0, (Number(next.endDepth) || 0) - (Number(next.startDepth) || 0));
+    }
+    setLocal(next);
     setUnsaved(true);
   };
 
@@ -64,49 +77,48 @@ export default function PropertiesPanel({ component, onUpdate, onDuplicate, onDe
       </div>
 
       <div className="properties-grid">
-        <Field label="ID" value={component.id} disabled className="col-2" />
-        <Field label="Tipe" value={label} disabled className="col-2" />
+        <Field label="ID" value={component.id} disabled readOnly className="col-2" />
+        <Field label="Tipe" value={label} disabled readOnly className="col-2" />
 
         {isInterval ? (
           <>
             <Field label="Kedalaman mulai" unit="m" type="number" inputMode="decimal" step="0.1"
-              value={(local || {}).startDepth !== undefined ? (local || {}).startDepth : component.startDepth}
-              onChange={(e) => handleChange('startDepth', e.target.value)} />
+              value={val('startDepth')} onChange={(e) => handleChange('startDepth', e.target.value)} />
             <Field label="Kedalaman akhir" unit="m" type="number" inputMode="decimal" step="0.1"
-              value={(local || {}).endDepth !== undefined ? (local || {}).endDepth : component.endDepth}
-              onChange={(e) => handleChange('endDepth', e.target.value)} />
-            <Field label="Panjang" unit="m" type="number" inputMode="decimal" step="0.1"
-              value={(local || {}).length !== undefined ? (local || {}).length : component.length}
-              onChange={(e) => handleChange('length', e.target.value)}
-              hint="Dihitung dari kedalaman akhir − mulai" />
+              value={val('endDepth')} onChange={(e) => handleChange('endDepth', e.target.value)} />
+            <Field label="Panjang (otomatis)" unit="m" type="number" readOnly tabIndex={-1} className="is-computed col-2"
+              value={Math.max(0, (Number(val('endDepth')) || 0) - (Number(val('startDepth')) || 0))
+                .toFixed(2).replace(/\.?0+$/, '')} />
           </>
         ) : (
-          <Field label="Kedalaman" unit="m" type="number" inputMode="decimal" step="0.1"
-            value={(local || {}).startDepth !== undefined ? (local || {}).startDepth : component.startDepth}
-            onChange={(e) => handleChange('startDepth', e.target.value)}
-            hint="Kedalaman penanda komponen" />
+          <Field label="Kedalaman" unit="m" type="number" inputMode="decimal" step="0.1" className="col-2"
+            value={val('startDepth')} onChange={(e) => handleChange('startDepth', e.target.value)} />
         )}
 
         <Field label="Diameter luar" unit="mm" type="number" inputMode="decimal" step="1"
-          value={(local || {}).outerDiameter !== undefined ? (local || {}).outerDiameter : component.outerDiameter}
-          onChange={(e) => handleChange('outerDiameter', e.target.value)} />
-        {component.innerDiameter !== null && component.innerDiameter !== undefined ? (
+          value={val('outerDiameter')} onChange={(e) => handleChange('outerDiameter', e.target.value)} />
+        {hasInner ? (
           <Field label="Diameter dalam" unit="mm" type="number" inputMode="decimal" step="1"
-            value={(local || {}).innerDiameter !== undefined ? (local || {}).innerDiameter : component.innerDiameter}
-            onChange={(e) => handleChange('innerDiameter', e.target.value)}
-            hint="Kosongkan jika tidak berlaku" />
-        ) : null}
-        <Field label="Materi" value={(local || {}).material !== undefined ? (local || {}).material : component.material}
-          onChange={(e) => handleChange('material', e.target.value)} />
-        <Field label="Warna" value={(local || {}).color !== undefined ? (local || {}).color : component.color}
-          onChange={(e) => handleChange('color', e.target.value)} />
-        <Field label="Deskripsi" as="textarea" rows={2} className="col-2"
-          value={(local || {}).description !== undefined ? (local || {}).description : component.description}
-          onChange={(e) => handleChange('description', e.target.value)} />
+            value={val('innerDiameter')} onChange={(e) => handleChange('innerDiameter', e.target.value)} />
+        ) : <div className="field-spacer" aria-hidden="true" />}
+
+        <Field label="Materi" value={val('material')} onChange={(e) => handleChange('material', e.target.value)} />
+        <label className="field">
+          <span className="field-label">Warna</span>
+          <span className="field-control color-control">
+            <input type="color" className="color-swatch" aria-label="Pilih warna"
+              value={/^#[0-9a-f]{6}$/i.test(val('color') || '') ? val('color') : '#64748b'}
+              onChange={(e) => handleChange('color', e.target.value)} />
+            <input className="field-input color-hex" value={val('color') || ''} maxLength={7} spellCheck={false}
+              onChange={(e) => handleChange('color', e.target.value)} />
+          </span>
+        </label>
+
+        <Field label="Deskripsi" as="textarea" rows={3} className="col-2"
+          value={val('description') || ''} onChange={(e) => handleChange('description', e.target.value)} />
         <Field label="Z-order" className="col-2" type="number" inputMode="decimal" step="1"
-          value={(local || {}).zOrder !== undefined ? (local || {}).zOrder : component.zOrder}
-          onChange={(e) => handleChange('zOrder', e.target.value)}
-          hint="Prioritas rendering (rendah = dibelakang)" />
+          value={val('zOrder')} onChange={(e) => handleChange('zOrder', e.target.value)}
+          hint="Prioritas rendering (rendah = di belakang)" />
       </div>
 
       <div className="property-actions">
